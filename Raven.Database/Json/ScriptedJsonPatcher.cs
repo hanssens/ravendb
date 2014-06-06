@@ -5,19 +5,17 @@
 //-----------------------------------------------------------------------
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
+using Jint;
 using Jint.Native;
+using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
-using Raven.Abstractions.Json;
-using Raven.Imports.Newtonsoft.Json;
 using Raven.Imports.Newtonsoft.Json.Linq;
 using Raven.Json.Linq;
-using System.Reflection;
-using System.IO;
-using Jint;
-using Raven.Abstractions.Data;
-using Environment = System.Environment;
 
 namespace Raven.Database.Json
 {
@@ -34,7 +32,7 @@ namespace Raven.Database.Json
 		private readonly int maxSteps;
 		private readonly int additionalStepsPerSize;
 
-		private readonly Dictionary<string, JTokenType> propertiesTypeByName;
+		private readonly Dictionary<JsInstance, KeyValuePair<RavenJValue, object>> propertiesByValue = new Dictionary<JsInstance, KeyValuePair<RavenJValue, object>>();
 
 		public ScriptedJsonPatcher(DocumentDatabase database = null)
 		{
@@ -58,7 +56,6 @@ namespace Raven.Database.Json
 					return jsonDocument == null ? null : jsonDocument.ToJson();
 				};
 			}
-			propertiesTypeByName = new Dictionary<string, JTokenType>();
 		}
 
 		public RavenJObject Apply(RavenJObject document, ScriptedPatchRequest patch, int size = 0, string docId = null)
@@ -183,71 +180,91 @@ namespace Raven.Database.Json
 					case JsInstance.CLASS_FUNCTION:
 						continue;
 				}
-				rjo[key] = ToRavenJToken(jsInstance, key);
+				rjo[key] = ToRavenJToken(jsInstance);
 			}
 			return rjo;
 		}
 
-		private RavenJToken ToRavenJToken(JsInstance v, string propertyName)
+		private RavenJToken ToRavenJToken(JsInstance v)
 		{
 			switch (v.Class)
 			{
-				case JsInstance.TYPE_OBJECT:
-				case JsInstance.CLASS_OBJECT:
-					return ToRavenJObject((JsObject)v);
-				case JsInstance.CLASS_DATE:
-					var dt = (DateTime)v.Value;
-					return new RavenJValue(dt);
-				case JsInstance.TYPE_NUMBER:
-				case JsInstance.CLASS_NUMBER:
-					var num = (double)v.Value;
+			    case JsInstance.TYPE_OBJECT:
+			    case JsInstance.CLASS_OBJECT:
+			        return ToRavenJObject((JsObject) v);
+			    case JsInstance.CLASS_DATE:
+			        var dt = (DateTime) v.Value;
+			        return new RavenJValue(dt);
+			    case JsInstance.TYPE_NUMBER:
+			    case JsInstance.CLASS_NUMBER:
+			        var num = (double) v.Value;
 
-					JTokenType type;
-					if (propertiesTypeByName.TryGetValue(propertyName, out type))
+					KeyValuePair<RavenJValue, object> property;
+					if (propertiesByValue.TryGetValue(v, out property))
 					{
-						if (type == JTokenType.Float)
-							return new RavenJValue(num);
-						if (type == JTokenType.Integer)
+						var originalValue = property.Key;
+						if (originalValue.Type == JTokenType.Float)
+			                return new RavenJValue(num);
+						if (originalValue.Type == JTokenType.Integer)
+				        {
+							// If the current value is exactly as the original value, we can return the original value before we made the JS conversion, 
+							// which will convert a Int64 to jsFloat.
+							var originalJsValue = property.Value;
+							if (originalJsValue is double && Math.Abs(num - (double)originalJsValue) < double.Epsilon)
+								return originalValue;
+					        
 							return new RavenJValue((long) num);
-					}
+				        }
+			        }
 
-					// If we don't have the type, assume that if the number ending with ".0" it actually an integer.
-					var integer = Math.Truncate(num);
-					if (Math.Abs(num - integer) < double.Epsilon)
-						return new RavenJValue((long)integer);
-					return new RavenJValue(num);
-				case JsInstance.TYPE_STRING:
-				case JsInstance.TYPE_BOOLEAN:
-				case JsInstance.CLASS_STRING:
-				case JsInstance.CLASS_BOOLEAN:
-					return new RavenJValue(v.Value);
-				case JsInstance.CLASS_NULL:
-				case JsInstance.TYPE_NULL:
-					return RavenJValue.Null;
-				case JsInstance.CLASS_UNDEFINED:
-				case JsInstance.TYPE_UNDEFINED:
-					return RavenJValue.Null;
-				case JsInstance.CLASS_ARRAY:
-					var jsArray = ((JsArray)v);
-					var rja = new RavenJArray();
+			        // If we don't have the type, assume that if the number ending with ".0" it actually an integer.
+			        var integer = Math.Truncate(num);
+			        if (Math.Abs(num - integer) < double.Epsilon)
+			            return new RavenJValue((long) integer);
+			        return new RavenJValue(num);
+			    case JsInstance.TYPE_STRING:
+			    case JsInstance.CLASS_STRING:
+			    {
+			        const string ravenDataByteArrayToBase64 = "raven-data:byte[];base64,";
+			        var value = v.Value as string;
+			        if (value != null && value.StartsWith(ravenDataByteArrayToBase64))
+			        {
+			            value = value.Remove(0, ravenDataByteArrayToBase64.Length);
+			            var byteArray = Convert.FromBase64String(value);
+			            return new RavenJValue(byteArray);
+			        }
+                    return new RavenJValue(v.Value);
+			    }
+			    case JsInstance.TYPE_BOOLEAN:
+			    case JsInstance.CLASS_BOOLEAN:
+			        return new RavenJValue(v.Value);
+			    case JsInstance.CLASS_NULL:
+			    case JsInstance.TYPE_NULL:
+			        return RavenJValue.Null;
+			    case JsInstance.CLASS_UNDEFINED:
+			    case JsInstance.TYPE_UNDEFINED:
+			        return RavenJValue.Null;
+			    case JsInstance.CLASS_ARRAY:
+			        var jsArray = ((JsArray) v);
+			        var rja = new RavenJArray();
 
-					for (int i = 0; i < jsArray.Length; i++)
-					{
-						var jsInstance = jsArray.get(i);
-						var ravenJToken = ToRavenJToken(jsInstance, propertyName);
-						if (ravenJToken == null)
-							continue;
-						rja.Add(ravenJToken);
-					}
-					return rja;
-				case JsInstance.CLASS_REGEXP:
-				case JsInstance.CLASS_ERROR:
-				case JsInstance.CLASS_ARGUMENTS:
-				case JsInstance.CLASS_DESCRIPTOR:
-				case JsInstance.CLASS_FUNCTION:
-					return null;
-				default:
-					throw new NotSupportedException(v.Class);
+			        for (int i = 0; i < jsArray.Length; i++)
+			        {
+			            var jsInstance = jsArray.get(i);
+			            var ravenJToken = ToRavenJToken(jsInstance);
+			            if (ravenJToken == null)
+			                continue;
+			            rja.Add(ravenJToken);
+			        }
+			        return rja;
+			    case JsInstance.CLASS_REGEXP:
+			    case JsInstance.CLASS_ERROR:
+			    case JsInstance.CLASS_ARGUMENTS:
+			    case JsInstance.CLASS_DESCRIPTOR:
+			    case JsInstance.CLASS_FUNCTION:
+			        return null;
+			    default:
+			        throw new NotSupportedException(v.Class);
 			}
 		}
 
@@ -256,10 +273,13 @@ namespace Raven.Database.Json
 			var jsObject = global.ObjectClass.New();
 			foreach (var prop in doc)
 			{
-				if (prop.Value is RavenJValue)
-					propertiesTypeByName[prop.Key] = prop.Value.Type;
-				var val = ToJsInstance(global, prop.Value);
-				jsObject.DefineOwnProperty(prop.Key, val);
+				var jsValue = ToJsInstance(global, prop.Value);
+
+				var value = prop.Value as RavenJValue;
+				if (value != null)
+					propertiesByValue[jsValue] = new KeyValuePair<RavenJValue, object>(value, jsValue.Value);
+
+				jsObject.DefineOwnProperty(prop.Key, jsValue);
 			}
 			return jsObject;
 		}
@@ -297,6 +317,10 @@ namespace Raven.Database.Json
 				case JTokenType.String:
 					var strVal = ((RavenJValue)value);
 					return global.StringClass.New((string)strVal.Value);
+                case JTokenType.Bytes:
+			        var byteValue = (RavenJValue)value;
+			        var base64 = Convert.ToBase64String((byte[])byteValue.Value);
+                    return global.StringClass.New("raven-data:byte[];base64," + base64);
 				default:
 					throw new NotSupportedException(value.Type.ToString());
 			}
@@ -326,8 +350,12 @@ function ExecutePatchScript(docInner){{
 
 			var jintEngine = new JintEngine()
 				.AllowClr(false)
-				.SetDebugMode(false)
-				.SetMaxRecursions(50)
+#if DEBUG
+				.SetDebugMode(true)
+#else
+                .SetDebugMode(false)
+#endif
+                .SetMaxRecursions(50)
 				.SetMaxSteps(maxSteps);
 
             AddScript(jintEngine, "Raven.Database.Json.lodash.js");

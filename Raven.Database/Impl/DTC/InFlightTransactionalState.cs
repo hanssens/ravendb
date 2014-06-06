@@ -7,6 +7,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Transactions;
 using Raven.Abstractions;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
@@ -16,6 +17,7 @@ using Raven.Database.Storage;
 using Raven.Database.Util;
 using Raven.Json.Linq;
 using System.Linq;
+using TransactionInformation = Raven.Abstractions.Data.TransactionInformation;
 
 namespace Raven.Database.Impl.DTC
 {
@@ -135,7 +137,7 @@ namespace Raven.Database.Impl.DTC
         public virtual void Rollback(string id)
 		{
 			TransactionState value;
-			if (transactionStates.TryGetValue(id, out value) == false)
+			if (transactionStates.TryRemove(id, out value) == false)
 				return;
 			lock (value)
 			{
@@ -144,9 +146,8 @@ namespace Raven.Database.Impl.DTC
 					ChangedDoc guid;
 					changedInTransaction.TryRemove(change.Key, out guid);
 				}
+				value.changes.Clear();
 			}
-
-			transactionStates.TryRemove(id, out value);
 		}
 
         protected readonly ThreadLocal<string> currentlyCommittingTransaction = new ThreadLocal<string>();
@@ -174,14 +175,12 @@ namespace Raven.Database.Impl.DTC
 					var currentTxVal = state.changes.LastOrDefault(x => string.Equals(x.Key, key, StringComparison.InvariantCultureIgnoreCase));
 					if (currentTxVal != null)
 					{
-						if (etag != null && currentTxVal.Etag != etag)
-							throw new ConcurrencyException("Transaction operation attempted on : " + key + " using a non current etag");
-						state.changes.Remove(currentTxVal);
+						EnsureValidEtag(key, etag, committedEtag, currentTxVal);
+					    state.changes.Remove(currentTxVal);
 					}
-					var result = changedInTransaction.AddOrUpdate(key, s =>
+				    var result = changedInTransaction.AddOrUpdate(key, s =>
 					{
-						if (etag != null && etag != committedEtag)
-							throw new ConcurrencyException("Transaction operation attempted on : " + key + " using a non current etag");
+						EnsureValidEtag(key, etag, committedEtag, currentTxVal);
 
 						return new ChangedDoc
 						{
@@ -193,9 +192,8 @@ namespace Raven.Database.Impl.DTC
 					{
 						if (existing.transactionId == transactionInformation.Id)
 						{
-							if (etag != null && etag != existing.currentEtag)
-								throw new ConcurrencyException("Transaction operation attempted on : " + key + " using a non current etag");
-
+							EnsureValidEtag(key, etag, committedEtag, currentTxVal);
+							existing.currentEtag = item.Etag;
 							return existing;
 						}
 
@@ -205,8 +203,7 @@ namespace Raven.Database.Impl.DTC
 						{
 							Rollback(existing.transactionId);
 
-							if (etag != null && etag != committedEtag)
-								throw new ConcurrencyException("Transaction operation attempted on : " + key + " using a non current etag");
+							EnsureValidEtag(key, etag, committedEtag, currentTxVal);
 
 							return new ChangedDoc
 							{
@@ -219,7 +216,7 @@ namespace Raven.Database.Impl.DTC
 						throw new ConcurrencyException("Document " + key + " is being modified by another transaction: " + existing);
 					});
 
-
+					item.CommittedEtag = committedEtag;
 					state.changes.Add(item);
 
 					return result.currentEtag;
@@ -232,7 +229,32 @@ namespace Raven.Database.Impl.DTC
 			}
 		}
 
-		public bool TryGet(string key, TransactionInformation transactionInformation, out JsonDocument document)
+	    private static void EnsureValidEtag(string key, Etag etag, Etag committedEtag, DocumentInTransactionData currentTxVal)
+	    {
+	        if (etag == null)
+	            return;
+            if (currentTxVal != null && currentTxVal.Delete)
+	        {
+                if (etag != Etag.Empty)
+	                throw new ConcurrencyException("Transaction operation attempted on : " + key + " using a non current etag (delete)");
+	            return;
+	        }
+
+	        if (currentTxVal != null)
+	        {
+	            if (currentTxVal.Etag != etag)
+	            {
+	                throw new ConcurrencyException("Transaction operation attempted on : " + key +
+	                                               " using a non current etag");
+	            }
+	            return;
+	        }
+
+	        if(etag != committedEtag)
+				throw new ConcurrencyException("Transaction operation attempted on : " + key + " using a non current etag");
+	    }
+
+	    public bool TryGet(string key, TransactionInformation transactionInformation, out JsonDocument document)
 		{
 			return TryGetInternal(key, transactionInformation, (theKey, change) => new JsonDocument
 			{
@@ -301,10 +323,11 @@ namespace Raven.Database.Impl.DTC
 					{
 						var doc = new DocumentInTransactionData
 						{
-							Metadata = change.Metadata == null ? null : (RavenJObject)change.Metadata.CreateSnapshot(),
-							Data = change.Data == null ? null : (RavenJObject)change.Data.CreateSnapshot(),
+							Metadata = change.Metadata == null ? null : (RavenJObject) change.Metadata.CreateSnapshot(),
+							Data = change.Data == null ? null : (RavenJObject) change.Data.CreateSnapshot(),
 							Delete = change.Delete,
 							Etag = change.Etag,
+							CommittedEtag = change.CommittedEtag,
 							LastModified = change.LastModified,
 							Key = change.Key
 						};
@@ -313,9 +336,9 @@ namespace Raven.Database.Impl.DTC
 						// doc.Etag - represent the _modified_ document etag, and we already
 						// checked etags on previous PUT/DELETE, so we don't pass it here
 						if (doc.Delete)
-							databaseDelete(doc.Key, null, null);
+							databaseDelete(doc.Key, doc.CommittedEtag, null);
 						else
-							databasePut(doc.Key, null, doc.Data, doc.Metadata, null);
+							databasePut(doc.Key, doc.CommittedEtag, doc.Data, doc.Metadata, null);
 					}
 				}
 				finally

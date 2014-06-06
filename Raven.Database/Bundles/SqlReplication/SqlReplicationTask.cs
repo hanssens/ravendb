@@ -19,7 +19,6 @@ using Raven.Abstractions.Logging;
 using Raven.Abstractions.Util;
 using Raven.Database.Extensions;
 using Raven.Database.Impl;
-using Raven.Database.Impl.Synchronization;
 using Raven.Database.Indexing;
 using Raven.Database.Json;
 using Raven.Database.Plugins;
@@ -48,12 +47,10 @@ namespace Raven.Database.Bundles.SqlReplication
 
 		private PrefetchingBehavior prefetchingBehavior;
 
-		private EtagSynchronizer etagSynchronizer;
 		private Etag lastLatestEtag;
 
 		public void Execute(DocumentDatabase database)
 		{
-			etagSynchronizer = database.EtagSynchronizer.GetSynchronizer(EtagSynchronizerType.SqlReplicator);
 			prefetchingBehavior = database.Prefetcher.GetPrefetchingBehavior(PrefetchingUser.SqlReplicator, null);
 
 			Database = database;
@@ -174,7 +171,9 @@ namespace Raven.Database.Bundles.SqlReplication
 				
 				if (documents.Count != 0)
 					latestEtag = documents[documents.Count - 1].Etag;
-				
+
+				documents.RemoveAll(x => prefetchingBehavior.FilterDocuments(x) == false);
+
 				var deletedDocsByConfig = new Dictionary<SqlReplicationConfig, List<ListItem>>();
 
 				foreach (var relevantConfig in relevantConfigs)
@@ -224,12 +223,27 @@ namespace Raven.Database.Bundles.SqlReplication
 							var deletedDocs = deletedDocsByConfig[replicationConfig];
 							var docsToReplicate = documents
 								.Where(x => lastReplicatedEtag.CompareTo(x.Etag) <= 0) // haven't replicate the etag yet
+                                .Where(document =>
+                                {
+                                    var info = Database.GetRecentTouchesFor(document.Key);
+                                    if (info != null)
+                                    {
+                                        if (info.TouchedEtag.CompareTo(lastReplicatedEtag) > 0)
+                                        {
+                                            log.Debug(
+                                                "Will not replicate document '{0}' to '{1}' because the updates after etag {2} are related document touches",
+                                                document.Key, replicationConfig.Name, info.TouchedEtag);
+                                            return false;
+                                        }
+                                    }
+	                                return true;
+                                })
 								.ToList();
 
 							var currentLatestEtag = HandleDeletesAndChangesMerging(deletedDocs, docsToReplicate);
 
 							if (ReplicateDeletionsToDestination(replicationConfig, deletedDocs) &&
-								ReplicateChangesToDesintation(replicationConfig, docsToReplicate))
+								ReplicateChangesToDestination(replicationConfig, docsToReplicate))
 							{
 								if (deletedDocs.Count > 0)
 								{
@@ -371,6 +385,7 @@ namespace Raven.Database.Bundles.SqlReplication
 					writer.DeleteItems(sqlReplicationTable.TableName, sqlReplicationTable.DocumentKeyColumn, cfg.ParameterizeDeletesDisabled, identifiers);
 				}
 				writer.Commit();
+				log.Debug("Replicated deletes of {0} for config {1}", string.Join(", ", identifiers), cfg.Name);
 			}
 
 			return true;
@@ -383,7 +398,6 @@ namespace Raven.Database.Bundles.SqlReplication
 
 		private Etag GetLeastReplicatedEtag(IEnumerable<SqlReplicationConfig> config, SqlReplicationStatus localReplicationStatus)
 		{
-			var synchronizationEtag = etagSynchronizer.GetSynchronizationEtag();
 			Etag leastReplicatedEtag = null;
 			foreach (var sqlReplicationConfig in config)
 			{
@@ -393,12 +407,11 @@ namespace Raven.Database.Bundles.SqlReplication
 				else if (lastEtag.CompareTo(leastReplicatedEtag) < 0)
 					leastReplicatedEtag = lastEtag;
 			}
-			var calculateSynchronizationEtag = etagSynchronizer.CalculateSynchronizationEtag(synchronizationEtag, leastReplicatedEtag);
 
-			return calculateSynchronizationEtag;
+			return leastReplicatedEtag;
 		}
 
-		private bool ReplicateChangesToDesintation(SqlReplicationConfig cfg, IEnumerable<JsonDocument> docs)
+		private bool ReplicateChangesToDestination(SqlReplicationConfig cfg, IEnumerable<JsonDocument> docs)
 		{
 			var scriptResult = ApplyConversionScript(cfg, docs);
 			if (scriptResult.Data.Count == 0)
@@ -410,9 +423,15 @@ namespace Raven.Database.Bundles.SqlReplication
 				using (var writer = new RelationalDatabaseWriter(Database, cfg, replicationStats))
 				{
 					if (writer.Execute(scriptResult))
+					{
+						log.Debug("Replicated changes of {0} for replication {1}", string.Join(", ", docs.Select(d => d.Key)), cfg.Name);
 						replicationStats.CompleteSuccess(countOfItems);
+					}
 					else
+					{
+						log.Debug("Replicated changes (with some errors) of {0} for replication {1}", string.Join(", ", docs.Select(d => d.Key)), cfg.Name);
 						replicationStats.Success(countOfItems);
+					}
 				}
 				return true;
 			}
@@ -473,7 +492,7 @@ namespace Raven.Database.Bundles.SqlReplication
 				{
 					replicationStats.MarkScriptAsInvalid(Database, cfg.Script);
 
-					log.WarnException("Could parse SQL Replication script for " + cfg.Name, e);
+					log.WarnException("Could not parse SQL Replication script for " + cfg.Name, e);
 
 					return result;
 				}

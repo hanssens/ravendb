@@ -5,6 +5,7 @@
 //-----------------------------------------------------------------------
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.Composition.Primitives;
 using System.Diagnostics;
 using System.IO;
@@ -42,6 +43,7 @@ namespace Raven.Tests.Helpers
 
 		public RavenTestBase()
 		{
+            Environment.SetEnvironmentVariable(Constants.RavenDefaultQueryTimeout, "30");
 			CommonInitializationUtil.Initialize();
 		}
 
@@ -248,12 +250,15 @@ namespace Raven.Tests.Helpers
 			new RavenDocumentsByEntityName().Execute(documentStore);
 		}
 
-		public static void WaitForIndexing(IDocumentStore store, string db = null)
+		public static void WaitForIndexing(IDocumentStore store, string db = null,TimeSpan? timeout = null)
 		{
 			var databaseCommands = store.DatabaseCommands;
 			if (db != null)
 				databaseCommands = databaseCommands.ForDatabase(db);
-			Assert.True(SpinWait.SpinUntil(() => databaseCommands.GetStatistics().StaleIndexes.Length == 0, TimeSpan.FromSeconds(10)));
+		    bool spinUntil = SpinWait.SpinUntil(() => databaseCommands.GetStatistics().StaleIndexes.Length == 0, timeout ?? TimeSpan.FromSeconds(20));
+		    if (spinUntil == false)
+		        WaitForUserToContinueTheTest((EmbeddableDocumentStore) store);
+		    Assert.True(spinUntil);
 		}
 
 		public static void WaitForIndexing(DocumentDatabase db)
@@ -355,7 +360,15 @@ namespace Raven.Tests.Helpers
 			using (var server = new HttpServer(documentStore.Configuration, documentStore.DocumentDatabase))
 			{
 				server.StartListening();
-				Process.Start(documentStore.Configuration.ServerUrl); // start the server
+
+				try
+				{
+					Process.Start(documentStore.Configuration.ServerUrl); // start the server
+				}
+				catch (Win32Exception e)
+				{
+					Console.WriteLine("Failed to open the browser. Please open it manually at {0}. {1}", documentStore.Configuration.ServerUrl, e);
+				}
 
 				do
 				{
@@ -364,14 +377,14 @@ namespace Raven.Tests.Helpers
 			}
 		}
 
-		protected void WaitForUserToContinueTheTest(bool debug = true)
+		protected void WaitForUserToContinueTheTest(bool debug = true, string url = null)
 		{
 			if (debug && Debugger.IsAttached == false)
 				return;
 
 			using (var documentStore = new DocumentStore
 			{
-				Url = "http://localhost:8079"
+				Url = url ?? "http://localhost:8079"
 			})
 			{
 				documentStore.Initialize();
@@ -406,6 +419,8 @@ namespace Raven.Tests.Helpers
 					GC.Collect();
 					GC.WaitForPendingFinalizers();
 					isRetry = true;
+
+                    Thread.Sleep(2500);
 				}
 			}
 		}

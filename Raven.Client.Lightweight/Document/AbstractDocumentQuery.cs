@@ -269,12 +269,18 @@ namespace Raven.Client.Document
 		protected Action<QueryResult> afterQueryExecutedCallback;
 		protected Etag cutoffEtag;
 
+	    private int? _defaultTimeout;
+
 		private TimeSpan DefaultTimeout
 		{
 			get
 			{
 				if (Debugger.IsAttached) // increase timeout if we are debugging
 					return TimeSpan.FromMinutes(15);
+
+                if (_defaultTimeout.HasValue)
+                    return TimeSpan.FromSeconds(_defaultTimeout.Value);
+
 				return TimeSpan.FromSeconds(15);
 			}
 		}
@@ -324,6 +330,15 @@ namespace Raven.Client.Document
 			conventions = theSession == null ? new DocumentConvention() : theSession.Conventions;
 			linqPathProvider = new LinqPathProvider(conventions);
 
+#if !SILVERLIGHT
+		    var timeoutAsString = Environment.GetEnvironmentVariable(Constants.RavenDefaultQueryTimeout);
+		    int defaultTimeout;
+		    if (!string.IsNullOrEmpty(timeoutAsString) && int.TryParse(timeoutAsString, out defaultTimeout))
+		    {
+		        _defaultTimeout = defaultTimeout;
+		    }
+#endif
+
 			if(conventions.DefaultQueryingConsistency == ConsistencyOptions.AlwaysWaitForNonStaleResultsAsOfLastWrite)
 			{
 				WaitForNonStaleResultsAsOfLastWrite();
@@ -348,6 +363,8 @@ namespace Raven.Client.Document
 			theAsyncDatabaseCommands = other.theAsyncDatabaseCommands;
 			indexName = other.indexName;
 			linqPathProvider = other.linqPathProvider;
+		    allowMultipleIndexEntriesForSameDocumentToResultTransformer =
+                other.allowMultipleIndexEntriesForSameDocumentToResultTransformer;
 			projectionFields = other.projectionFields;
 			theSession = other.theSession;
 			conventions = other.conventions;
@@ -799,7 +816,13 @@ namespace Raven.Client.Document
 			return this;
 		}
 
-		IDocumentQueryCustomization IDocumentQueryCustomization.SetHighlighterTags(string preTag, string postTag)
+	    IDocumentQueryCustomization IDocumentQueryCustomization.SetAllowMultipleIndexEntriesForSameDocumentToResultTransformer(bool val)
+	    {
+	        this.SetAllowMultipleIndexEntriesForSameDocumentToResultTransformer(val);
+	        return this;
+	    }
+
+	    IDocumentQueryCustomization IDocumentQueryCustomization.SetHighlighterTags(string preTag, string postTag)
 		{
 			this.SetHighlighterTags(preTag, postTag);
 			return this;
@@ -1167,33 +1190,39 @@ If you really want to do in memory filtering on the data returned from the query
 			AppendSpaceIfNeeded(queryText.Length > 0 && char.IsWhiteSpace(queryText[queryText.Length - 1]) == false);
 			NegateIfNeeded();
 
+			var whereParams = new WhereParams
+			{
+				FieldName = fieldName
+			};
+			fieldName = EnsureValidFieldName(whereParams);
+
             var list = UnpackEnumerable(values).ToList();
 
 			if(list.Count == 0)
 			{
 				queryText.Append("@emptyIn<")
-					.Append(fieldName)
+					.Append(RavenQuery.EscapeField(fieldName))
 					.Append(">:(no-results)");
 				return;
 			}
 
 			queryText.Append("@in<")
-				.Append(fieldName)
+				.Append(RavenQuery.EscapeField(fieldName))
 				.Append(">:(");
 
 			var first = true;
-			AddItemToInClause(fieldName, list, first);
+			AddItemToInClause(whereParams, list, first);
 			queryText.Append(") ");
 		}
 
-		private void AddItemToInClause(string fieldName, IEnumerable<object> list, bool first)
+		private void AddItemToInClause(WhereParams whereParams, IEnumerable<object> list, bool first)
 		{
 			foreach (var value in list)
 			{
 				var enumerable = value as IEnumerable;
 				if (enumerable != null && value is string == false)
 				{
-					AddItemToInClause(fieldName, enumerable.Cast<object>(), first);
+					AddItemToInClause(whereParams, enumerable.Cast<object>(), first);
 					return;
 				}
 				if (first == false)
@@ -1201,15 +1230,15 @@ If you really want to do in memory filtering on the data returned from the query
 					queryText.Append(",");
 				}
 				first = false;
-				var whereParams = new WhereParams
+				var nestedWhereParams = new WhereParams
 				{
 					AllowWildcards = true,
 					IsAnalyzed = true,
-					FieldName = fieldName,
+					FieldName = whereParams.FieldName,
+					FieldTypeForIdentifier = whereParams.FieldTypeForIdentifier,
 					Value = value
 				};
-				EnsureValidFieldName(whereParams);
-				queryText.Append(TransformToEqualValue(whereParams).Replace(",", "`,`"));
+				queryText.Append(TransformToEqualValue(nestedWhereParams).Replace(",", "`,`"));
 			}
 		}
 
@@ -1786,6 +1815,7 @@ If you really want to do in memory filtering on the data returned from the query
 					HighlighterPreTags = highlighterPreTags.ToArray(),
 					HighlighterPostTags = highlighterPostTags.ToArray(),
                     ResultsTransformer = resultsTransformer,
+                    AllowMultipleIndexEntriesForSameDocumentToResultTransformer = allowMultipleIndexEntriesForSameDocumentToResultTransformer,
                     QueryInputs  = queryInputs,
 					DisableCaching = disableCaching
 				};
@@ -1808,6 +1838,7 @@ If you really want to do in memory filtering on the data returned from the query
 				HighlighterPostTags = highlighterPostTags.ToArray(),
                 ResultsTransformer = this.resultsTransformer,
                 QueryInputs = queryInputs,
+                AllowMultipleIndexEntriesForSameDocumentToResultTransformer = allowMultipleIndexEntriesForSameDocumentToResultTransformer,
 				DisableCaching = disableCaching
 			};
 
@@ -1825,9 +1856,10 @@ If you really want to do in memory filtering on the data returned from the query
 #endif
 
 			);
-		private QueryOperator defaultOperator;
+	    protected QueryOperator defaultOperator;
+	    protected bool allowMultipleIndexEntriesForSameDocumentToResultTransformer;
 
-		/// <summary>
+	    /// <summary>
 		/// Perform a search for documents which fields that match the searchTerms.
 		/// If there is more than a single term, each of them will be checked independently.
 		/// </summary>
@@ -2134,9 +2166,16 @@ If you really want to do in memory filtering on the data returned from the query
 			return propertyName;
 		}
 
-        public void SetResultTransformer(string resultsTransformer)
+	    public void SetAllowMultipleIndexEntriesForSameDocumentToResultTransformer(
+	        bool val)
 	    {
-            this.resultsTransformer = resultsTransformer;
+	        this.allowMultipleIndexEntriesForSameDocumentToResultTransformer =
+	            val;
+	    }
+
+        public void SetResultTransformer(string transformer)
+	    {
+            this.resultsTransformer = transformer;
 	    }
 	}
 }

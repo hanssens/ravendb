@@ -12,14 +12,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using Raven.Abstractions;
 using Raven.Abstractions.Data;
+using Raven.Abstractions.Extensions;
 using Raven.Abstractions.Logging;
-using Raven.Abstractions.Util;
 using Raven.Database.Config;
 using Raven.Database.Impl;
 using Raven.Database.Indexing;
 
 namespace Raven.Database.Prefetching
 {
+	using Util;
+
 	public class PrefetchingBehavior : IDisposable
 	{
 		private static readonly ILog log = LogManager.GetCurrentClassLogger();
@@ -28,8 +30,8 @@ namespace Raven.Database.Prefetching
 		private readonly ConcurrentDictionary<string, HashSet<Etag>> documentsToRemove =
 			new ConcurrentDictionary<string, HashSet<Etag>>(StringComparer.InvariantCultureIgnoreCase);
 
-		private readonly ConcurrentDictionary<string, HashSet<Etag>> updatedDocuments =
-			new ConcurrentDictionary<string, HashSet<Etag>>(StringComparer.InvariantCultureIgnoreCase);
+		private readonly ReaderWriterLockSlim updatedDocumentsLock = new ReaderWriterLockSlim();
+		private readonly SortedKeyList<Etag> updatedDocuments = new SortedKeyList<Etag>();
 
 		private readonly ConcurrentDictionary<Etag, FutureIndexBatch> futureIndexBatches =
 			new ConcurrentDictionary<Etag, FutureIndexBatch>();
@@ -58,6 +60,12 @@ namespace Raven.Database.Prefetching
 		}
 
 		#endregion
+
+		public IDisposable DocumentBatchFrom(Etag etag, out List<JsonDocument> documents)
+		{
+			documents = GetDocumentsBatchFrom(etag);
+			return DocumentBatch(documents);
+		}
 
 		public List<JsonDocument> GetDocumentsBatchFrom(Etag etag)
 		{
@@ -106,7 +114,10 @@ namespace Raven.Database.Prefetching
 				if (docsLoaded)
 					etag = result[result.Count - 1].Etag;
 
-			} while (result.Count < autoTuner.NumberOfItemsToIndexInSingleBatch && docsLoaded);
+			} while (result.Count < autoTuner.NumberOfItemsToIndexInSingleBatch && 
+					 docsLoaded &&
+					 (prefetchingQueue.Aggregate(0,(acc,doc) => acc + doc.SerializedSizeOnDisk) + 
+						autoTuner.CurrentlyUsedBatchSizes.Values.Sum()) < context.Configuration.MemoryLimitForIndexingInMB);
 			
 
 			return result;
@@ -129,11 +140,18 @@ namespace Raven.Database.Prefetching
 			nextDocEtag = HandleEtagGapsIfNeeded(nextDocEtag);
 			bool hasDocs = false;
 
-			while (items.Count < autoTuner.NumberOfItemsToIndexInSingleBatch && prefetchingQueue.TryPeek(out result) && nextDocEtag.CompareTo(result.Etag) >= 0)
+			while (items.Count < autoTuner.NumberOfItemsToIndexInSingleBatch && 
+				prefetchingQueue.TryPeek(out result) && 
+				nextDocEtag.CompareTo(result.Etag) >= 0)
 			{
 				// safe to do peek then dequeue because we are the only one doing the dequeues
-				// and here we are single threaded
-				prefetchingQueue.TryDequeue(out result);
+				// and here we are single threaded, but still, better to check
+				if (prefetchingQueue.TryDequeue(out result) == false)
+					continue;
+
+                // this shouldn't happen, but... 
+                if(result == null)
+                    continue;
 
 				if (result.Etag != nextDocEtag)
 					continue;
@@ -141,7 +159,7 @@ namespace Raven.Database.Prefetching
 				items.Add(result);
 				hasDocs = true;
 
-				nextDocEtag = EtagUtil.Increment(nextDocEtag, 1);
+				nextDocEtag = Abstractions.Util.EtagUtil.Increment(nextDocEtag, 1);
 				nextDocEtag = HandleEtagGapsIfNeeded(nextDocEtag);
 			}
 
@@ -152,6 +170,7 @@ namespace Raven.Database.Prefetching
 		{
 			if (context.Configuration.DisableDocumentPreFetchingForIndexing)
 				return false;
+
 			try
 			{
 				FutureIndexBatch nextBatch;
@@ -162,9 +181,7 @@ namespace Raven.Database.Prefetching
 					return false;
 
 				foreach (var jsonDocument in nextBatch.Task.Result)
-				{
 					prefetchingQueue.Add(jsonDocument);
-				}
 
 				return true;
 			}
@@ -211,6 +228,24 @@ namespace Raven.Database.Prefetching
 				return;
 			if (past.Count == 0)
 				return;
+
+		    var size = 1024;
+		    var count = context.LastActualIndexingBatchInfo.Count;
+		    if (count > 0)
+		    {
+		        size = context.LastActualIndexingBatchInfo.Aggregate(0, (o, c) => o + c.TotalDocumentCount)/count;
+		    }
+			var alreadyLoadedSize = futureIndexBatches.Values.Sum(x =>
+			{
+				if (x.Task.IsCompleted)
+					return x.Task.Result.Sum(doc => doc.SerializedSizeOnDisk);
+
+			    return size;
+			});
+
+			if (alreadyLoadedSize > context.Configuration.AvailableMemoryForRaisingIndexBatchSizeLimit)
+				return;
+
 			if (futureIndexBatches.Count > 5) // we limit the number of future calls we do
 			{
 				int alreadyLoaded = futureIndexBatches.Values.Sum(x =>
@@ -255,7 +290,7 @@ namespace Raven.Database.Prefetching
 					int localWork = 0;
 					while (context.RunIndexing)
 					{
-						jsonDocuments = GetJsonDocsFromDisk(EtagUtil.Increment(nextEtag, -1), null);
+						jsonDocuments = GetJsonDocsFromDisk(Abstractions.Util.EtagUtil.Increment(nextEtag, -1), null);
 						if (jsonDocuments.Count > 0)
 							break;
 
@@ -276,7 +311,7 @@ namespace Raven.Database.Prefetching
 
 		private Etag GetNextDocEtag(Etag etag)
 		{
-			var oneUpEtag = EtagUtil.Increment(etag, 1);
+			var oneUpEtag = Abstractions.Util.EtagUtil.Increment(etag, 1);
 
 			// no need to go to disk to find the next etag if we already have it in memory
 			if (prefetchingQueue.NextDocumentETag() == oneUpEtag)
@@ -304,7 +339,7 @@ namespace Raven.Database.Prefetching
 
 		public static JsonDocument GetHighestJsonDocumentByEtag(List<JsonDocument> past)
 		{
-			var highest = new ComparableByteArray(Etag.Empty);
+			var highest = new Abstractions.Util.ComparableByteArray(Etag.Empty);
 			JsonDocument highestDoc = null;
 			for (int i = past.Count - 1; i >= 0; i--)
 			{
@@ -313,7 +348,7 @@ namespace Raven.Database.Prefetching
 				{
 					continue;
 				}
-				highest = new ComparableByteArray(etag);
+				highest = new Abstractions.Util.ComparableByteArray(etag);
 				highestDoc = past[i];
 			}
 			return highestDoc;
@@ -343,8 +378,8 @@ namespace Raven.Database.Prefetching
 			foreach (FutureIndexBatch source in futureIndexBatches.Values.Where(x => (indexingAge - x.Age) > numberOfIndexingGenerationsAllowed).ToList())
 			{
 				ObserveDiscardedTask(source);
-				FutureIndexBatch _;
-				futureIndexBatches.TryRemove(source.StartingEtag, out _);
+				FutureIndexBatch batch;
+				futureIndexBatches.TryRemove(source.StartingEtag, out batch);
 			}
 		}
 
@@ -354,7 +389,8 @@ namespace Raven.Database.Prefetching
 				return;
 
 			if (prefetchingQueue.Count >= // don't use too much, this is an optimization and we need to be careful about using too much mem
-				context.Configuration.MaxNumberOfItemsToPreFetchForIndexing)
+				context.Configuration.MaxNumberOfItemsToPreFetchForIndexing ||
+				prefetchingQueue.Aggregate(0, (x,c) => x + SelectSerializedSizeOnDiskIfNotNull(c)) > context.Configuration.AvailableMemoryForRaisingIndexBatchSizeLimit)
 				return;
 
 			foreach (var jsonDocument in docs)
@@ -364,30 +400,34 @@ namespace Raven.Database.Prefetching
 			}
 		}
 
+		private int SelectSerializedSizeOnDiskIfNotNull(JsonDocument document)
+		{
+			return (document != null) ? document.SerializedSizeOnDisk : 0;
+		}
+
 		public void CleanupDocuments(Etag lastIndexedEtag)
 		{
-			var highest = new ComparableByteArray(lastIndexedEtag);
-
 			foreach (var docToRemove in documentsToRemove)
 			{
-				if (docToRemove.Value.All(etag => highest.CompareTo(etag) > 0) == false)
+				if (docToRemove.Value.All(etag => lastIndexedEtag.CompareTo(etag) > 0) == false)
 					continue;
 
 				HashSet<Etag> _;
 				documentsToRemove.TryRemove(docToRemove.Key, out _);
 			}
 
-			foreach (var updatedDocs in updatedDocuments)
+			updatedDocumentsLock.EnterWriteLock();
+			try
 			{
-				if (updatedDocs.Value.All(etag => highest.CompareTo(etag) > 0) == false)
-					continue;
-
-				HashSet<Etag> _;
-				updatedDocuments.TryRemove(updatedDocs.Key, out _);
+				updatedDocuments.RemoveSmallerOrEqual(lastIndexedEtag);
+			}
+			finally
+			{
+				updatedDocumentsLock.ExitWriteLock();
 			}
 
 			JsonDocument result;
-			while (prefetchingQueue.TryPeek(out result) && highest.CompareTo(result.Etag) >= 0)
+			while (prefetchingQueue.TryPeek(out result) && lastIndexedEtag.CompareTo(result.Etag) >= 0)
 			{
 				prefetchingQueue.TryDequeue(out result);
 			}
@@ -396,7 +436,7 @@ namespace Raven.Database.Prefetching
 		public bool FilterDocuments(JsonDocument document)
 		{
 			HashSet<Etag> etags;
-			return (documentsToRemove.TryGetValue(document.Key, out etags) && etags.Contains(document.Etag)) == false;
+			return (documentsToRemove.TryGetValue(document.Key, out etags) && etags.Any(x => x.CompareTo(document.Etag) >= 0)) == false;
 		}
 
 		public void AfterDelete(string key, Etag deletedEtag)
@@ -407,8 +447,15 @@ namespace Raven.Database.Prefetching
 
 		public void AfterUpdate(string key, Etag etagBeforeUpdate)
 		{
-			updatedDocuments.AddOrUpdate(key, s => new HashSet<Etag> { etagBeforeUpdate },
-										  (s, set) => new HashSet<Etag>(set) { etagBeforeUpdate });
+			updatedDocumentsLock.EnterWriteLock();
+			try
+			{
+			    updatedDocuments.Add(etagBeforeUpdate);
+			}
+			finally
+			{
+				updatedDocumentsLock.ExitWriteLock();
+			}
 		}
 
 		public bool ShouldSkipDeleteFromIndex(JsonDocument item)
@@ -433,7 +480,7 @@ namespace Raven.Database.Prefetching
 		{
 			while (documentsToRemove.Any(x => x.Value.Contains(nextEtag)))
 			{
-				nextEtag = EtagUtil.Increment(nextEtag, 1);
+				nextEtag = Abstractions.Util.EtagUtil.Increment(nextEtag, 1);
 			}
 
 			return nextEtag;
@@ -441,9 +488,20 @@ namespace Raven.Database.Prefetching
 
 		private Etag SkipUpdatedEtags(Etag nextEtag)
 		{
-			while (updatedDocuments.Any(x => x.Value.Contains(nextEtag)))
+			updatedDocumentsLock.EnterReadLock();
+			try
 			{
-				nextEtag = EtagUtil.Increment(nextEtag, 1);
+				var enumerator = updatedDocuments.GetEnumerator();
+
+				// here we relay on the fact that the updated docs collection is sorted
+				while (enumerator.MoveNext() && enumerator.Current.CompareTo(nextEtag) == 0)
+				{
+					nextEtag = Abstractions.Util.EtagUtil.Increment(nextEtag, 1);
+				}
+			}
+			finally
+			{
+				updatedDocumentsLock.ExitReadLock();
 			}
 
 			return nextEtag;
@@ -456,20 +514,33 @@ namespace Raven.Database.Prefetching
 			public int Age;
 			public Etag StartingEtag;
 			public Task<List<JsonDocument>> Task;
+
 		}
 
 		#endregion
 
+		protected IDisposable DocumentBatch(List<JsonDocument> jsonDocuments)
+		{
+			var batchId = Guid.NewGuid();
+
+			autoTuner.CurrentlyUsedBatchSizes.TryAdd(batchId, jsonDocuments.Sum(x => x.SerializedSizeOnDisk));
+			return new DisposableAction(() =>
+			{
+				long _;
+                autoTuner.CurrentlyUsedBatchSizes.TryRemove(batchId, out _);
+			});
+		}
+
 		public void UpdateAutoThrottler(List<JsonDocument> jsonDocs, TimeSpan indexingDuration)
 		{
-			int currentBatchSize = autoTuner.NumberOfItemsToIndexInSingleBatch;
+			int currentBatchLength = autoTuner.NumberOfItemsToIndexInSingleBatch;
 			int futureLen = futureIndexBatches.Values.Sum(x =>
 			{
 				if (x.Task.IsCompleted)
 				{
 					return x.Task.Result.Count;
 				}
-				return currentBatchSize / 15;
+				return currentBatchLength / 15;
 			});
 
 			long futureSize = futureIndexBatches.Values.Sum(x =>
@@ -479,8 +550,9 @@ namespace Raven.Database.Prefetching
 					var jsonResults = x.Task.Result;
 					return jsonResults.Sum(s => (long)s.SerializedSizeOnDisk);
 				}
-				return currentBatchSize * 256;
+				return currentBatchLength * 256;
 			});
+
 			autoTuner.AutoThrottleBatchSize(
 				jsonDocs.Count + futureLen, 
 				futureSize + jsonDocs.Sum(x => (long)x.SerializedSizeOnDisk),

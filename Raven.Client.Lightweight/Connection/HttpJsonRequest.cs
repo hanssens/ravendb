@@ -114,7 +114,7 @@ namespace Raven.Client.Connection
 			webRequest.Headers.Remove("Authorization");
 		}
 
-		public Task ExecuteRequestAsync()
+		public Task<RavenJToken> ExecuteRequestAsync()
 		{
 			return ReadResponseJsonAsync();
 		}
@@ -150,7 +150,7 @@ namespace Raven.Client.Connection
 				{
 					if (writeCalled == false)
 						webRequest.ContentLength = 0;
-					return await ReadJsonInternalAsync(webRequest.GetResponseAsync());
+                    return await ReadJsonInternalAsync(webRequest).ConfigureAwait(false);
 				}
 				catch (WebException e)
 				{
@@ -169,12 +169,12 @@ namespace Raven.Client.Connection
 
 				if (httpWebResponse.StatusCode == HttpStatusCode.Forbidden)
 				{
-					await HandleForbiddenResponseAsync(httpWebResponse);
-					await new CompletedTask(webException).Task; // Throws, preserving original stack
+                    await HandleForbiddenResponseAsync(httpWebResponse).ConfigureAwait(false);
+                    await new CompletedTask(webException).Task.ConfigureAwait(false); // Throws, preserving original stack
 				}
 
-				if (await HandleUnauthorizedResponseAsync(httpWebResponse) == false)
-					await new CompletedTask(webException).Task; // Throws, preserving original stack
+                if (await HandleUnauthorizedResponseAsync(httpWebResponse).ConfigureAwait(false) == false)
+                    await new CompletedTask(webException).Task.ConfigureAwait(false); // Throws, preserving original stack
 			}
 		}
 
@@ -182,11 +182,11 @@ namespace Raven.Client.Connection
 		{
 			if (writeCalled == false)
 				webRequest.ContentLength = 0;
-			using (var webResponse = await webRequest.GetResponseAsync())
+            using (var webResponse = await webRequest.GetResponseAsync().ConfigureAwait(false))
 			using (var stream = webResponse.GetResponseStreamWithHttpDecompression())
 			{
 				ResponseHeaders = new NameValueCollection(webResponse.Headers);
-				return await stream.ReadDataAsync();
+                return await stream.ReadDataAsync().ConfigureAwait(false);
 			}
 		}
 
@@ -292,7 +292,7 @@ namespace Raven.Client.Connection
 			if (unauthorizedResponseAsync == null)
 				return false;
 
-			RecreateWebRequest(await unauthorizedResponseAsync);
+            RecreateWebRequest(await unauthorizedResponseAsync.ConfigureAwait(false));
 			return true;
 		}
 
@@ -305,7 +305,7 @@ namespace Raven.Client.Connection
 			if (forbiddenResponseAsync == null)
 				return;
 
-			await forbiddenResponseAsync;
+            await forbiddenResponseAsync.ConfigureAwait(false);
 		}
 
 		private void RecreateWebRequest(Action<HttpWebRequest> action)
@@ -388,12 +388,12 @@ namespace Raven.Client.Connection
 			}
 		}
 
-		private async Task<RavenJToken> ReadJsonInternalAsync(Task<WebResponse> responseTask)
+		private async Task<RavenJToken> ReadJsonInternalAsync(WebRequest responseTask)
 		{
 			WebResponse response;
 			try
 			{
-				response = await responseTask;
+                response = await responseTask.GetResponseAsync().ConfigureAwait(false);
 				sp.Stop();
 			}
 			catch (WebException e)
@@ -413,7 +413,7 @@ namespace Raven.Client.Connection
 			using (response)
 			using (var responseStream = response.GetResponseStreamWithHttpDecompression())
 			{
-				var data = await RavenJToken.TryLoadAsync(responseStream);
+                var data = await RavenJToken.TryLoadAsync(responseStream).ConfigureAwait(false);
 
 				if (Method == "GET" && ShouldCacheRequest)
 				{
@@ -817,7 +817,7 @@ namespace Raven.Client.Connection
 
 				try
 				{
-					var response = await webRequest.GetResponseAsync();
+                    var response = await webRequest.GetResponseAsync().ConfigureAwait(false);
 					var stream = response.GetResponseStreamWithHttpDecompression();
 					var observableLineStream = new ObservableLineStream(stream, () =>
 					{
@@ -844,16 +844,16 @@ namespace Raven.Client.Connection
 
 				if (httpWebResponse.StatusCode == HttpStatusCode.Forbidden)
 				{
-					await HandleForbiddenResponseAsync(httpWebResponse);
-					await new CompletedTask(webException).Task; // Throws, preserving original stack
+                    await HandleForbiddenResponseAsync(httpWebResponse).ConfigureAwait(false);
+                    await new CompletedTask(webException).Task.ConfigureAwait(false); // Throws, preserving original stack
 				}
 
-				if (await HandleUnauthorizedResponseAsync(httpWebResponse) == false)
-					await new CompletedTask(webException).Task; // Throws, preserving original stack
+                if (await HandleUnauthorizedResponseAsync(httpWebResponse).ConfigureAwait(false) == false)
+                    await new CompletedTask(webException).Task.ConfigureAwait(false); // Throws, preserving original stack
 			}
 		}
 
-		public Task ExecuteWriteAsync(string data)
+		public Task<RavenJToken> ExecuteWriteAsync(string data)
 		{
 			try
 			{
@@ -862,11 +862,11 @@ namespace Raven.Client.Connection
 			}
 			catch (Exception e)
 			{
-				return new CompletedTask(e);
+				return new CompletedTask<RavenJToken>(e);
 			}
 		}
 
-		public Task ExecuteWriteAsync(byte[] data)
+		public Task<RavenJToken> ExecuteWriteAsync(byte[] data)
 		{
 			try
 			{
@@ -875,7 +875,7 @@ namespace Raven.Client.Connection
 			}
 			catch (Exception e)
 			{
-				return new CompletedTask(e);
+				return new CompletedTask<RavenJToken>(e);
 			}
 		}
 
@@ -923,7 +923,7 @@ namespace Raven.Client.Connection
 		{
 			try
 			{
-				return await webRequest.GetResponseAsync();
+                return await webRequest.GetResponseAsync().ConfigureAwait(false);
 			}
 			catch (WebException we)
 			{

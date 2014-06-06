@@ -1,5 +1,6 @@
 #if !NETFX_CORE
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -11,11 +12,13 @@ using Ionic.Zlib;
 #endif
 
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
 using Raven.Abstractions.Connection;
 using Raven.Abstractions.Data;
+using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Json;
 using Raven.Abstractions.Logging;
 using Raven.Abstractions.Util;
@@ -31,7 +34,7 @@ namespace Raven.Abstractions.Smuggler
 		private readonly Stopwatch stopwatch = Stopwatch.StartNew();
 
 		protected abstract Task<RavenJArray> GetIndexes(int totalCount);
-		protected abstract Task<IAsyncEnumerator<RavenJObject>> GetDocuments(Etag lastEtag);
+		protected abstract Task<IAsyncEnumerator<RavenJObject>> GetDocuments(Etag lastEtag, int limit);
 		protected abstract Task<Etag> ExportAttachments(JsonTextWriter jsonWriter, Etag lastEtag);
 		protected abstract Task<RavenJArray> GetTransformers(int start);
 
@@ -101,7 +104,17 @@ namespace Raven.Abstractions.Smuggler
 			if(incremental)
 				throw new NotSupportedException("Incremental exports are not supported in SL.");
 #endif
-			await DetectServerSupportedFeatures();
+			try
+			{
+				await DetectServerSupportedFeatures();
+			}
+			catch (WebException e)
+			{
+				ShowProgress("Failed to query server for supported features. Reason : " + e.Message);
+				SetLegacyMode();//could not detect supported features, then run in legacy mode			
+			}
+
+			SmugglerExportException lastException = null;
 
 			bool ownedStream = stream == null;
 			try
@@ -131,21 +144,39 @@ namespace Raven.Abstractions.Smuggler
 					jsonWriter.WriteStartArray();
 					if (options.OperateOnTypes.HasFlag(ItemType.Documents))
 					{
-						options.LastDocsEtag = await ExportDocuments(options, jsonWriter, options.LastDocsEtag);
+					    try
+					    {
+					        options.LastDocsEtag = await ExportDocuments(options, jsonWriter, options.LastDocsEtag);
+					    }
+					    catch (SmugglerExportException e)
+					    {
+					        options.LastDocsEtag = e.LastEtag;
+					        e.File = file;
+					        lastException = e;
+					    }
 					}
 					jsonWriter.WriteEndArray();
 
 					jsonWriter.WritePropertyName("Attachments");
 					jsonWriter.WriteStartArray();
-					if (options.OperateOnTypes.HasFlag(ItemType.Attachments))
+					if (options.OperateOnTypes.HasFlag(ItemType.Attachments) && lastException == null)
 					{
-						options.LastAttachmentEtag = await ExportAttachments(jsonWriter, options.LastAttachmentEtag);
+					    try
+					    {
+					        options.LastAttachmentEtag = await ExportAttachments(jsonWriter, options.LastAttachmentEtag);
+					    }
+					    catch (SmugglerExportException e)
+					    {
+					        options.LastAttachmentEtag = e.LastEtag;
+					        e.File = file;
+					        lastException = e;
+					    }
 					}
 					jsonWriter.WriteEndArray();
 
 					jsonWriter.WritePropertyName("Transformers");
 					jsonWriter.WriteStartArray();
-					if (options.OperateOnTypes.HasFlag(ItemType.Transformers))
+					if (options.OperateOnTypes.HasFlag(ItemType.Transformers) && lastException == null)
 					{
 						await ExportTransformers(jsonWriter);
 					}
@@ -159,6 +190,9 @@ namespace Raven.Abstractions.Smuggler
 				if (incremental && lastEtagsFromFile)
 					WriteLastEtagsFromFile(options);
 #endif
+
+			    if (lastException != null)
+			        throw lastException;
 				return file;
 			}
 			finally
@@ -237,55 +271,80 @@ namespace Raven.Abstractions.Smuggler
 
 		private async Task<Etag> ExportDocuments(SmugglerOptions options, JsonTextWriter jsonWriter, Etag lastEtag)
 		{
+		    var now = SystemTime.UtcNow;
 			var totalCount = 0;
 			var lastReport = SystemTime.UtcNow;
 			var reportInterval = TimeSpan.FromSeconds(2);
 			var errorcount = 0;
 			ShowProgress("Exporting Documents");
-
+			
 			while (true)
 			{
-				using (var documents = await GetDocuments(lastEtag))
-				{
-					var watch = Stopwatch.StartNew();					
+				bool hasDocs = false;
 
-					while (await documents.MoveNextAsync())
-					{
-					
-						var document = documents.Current;
+                try {
+                    var maxRecords = options.Limit - totalCount;
+                    if (maxRecords > 0)
+			        {
+			            using (var documents = await GetDocuments(lastEtag, maxRecords))
+			            {
+			                var watch = Stopwatch.StartNew();
 
-						if (!options.MatchFilters(document))
-							continue;
+			                while (await documents.MoveNextAsync())
+			                {
+			                    hasDocs = true;
+			                    var document = documents.Current;
+			                    lastEtag = Etag.Parse(document.Value<RavenJObject>("@metadata").Value<string>("@etag"));
 
-						if (options.ShouldExcludeExpired && options.ExcludeExpired(document))
-							continue;
-						document.WriteTo(jsonWriter);
-						totalCount++;
-						
-						if (totalCount%1000 == 0 || SystemTime.UtcNow - lastReport > reportInterval)
-						{
-							ShowProgress("Exported {0} documents", totalCount);
-							lastReport = SystemTime.UtcNow;
-						}
+			                    if (!options.MatchFilters(document))
+			                        continue;
 
-						lastEtag = Etag.Parse(document.Value<RavenJObject>("@metadata").Value<string>("@etag"));
-						if (watch.ElapsedMilliseconds > 100)
-							errorcount++;
-						watch.Start();
-					}
-				}
+                                if (options.ShouldExcludeExpired && options.ExcludeExpired(document, now))
+			                        continue;
 
-				var databaseStatistics = await GetStats();
-				var lastEtagComparable = new ComparableByteArray(lastEtag);
-				if (lastEtagComparable.CompareTo(databaseStatistics.LastDocEtag) < 0)
-				{
-					lastEtag = EtagUtil.Increment(lastEtag, SmugglerOptions.BatchSize);
-					ShowProgress("Got no results but didn't get to the last doc etag, trying from: {0}", lastEtag);
+			                    document.WriteTo(jsonWriter);
+			                    totalCount++;
 
-					continue;
-				}
+			                    if (totalCount%1000 == 0 || SystemTime.UtcNow - lastReport > reportInterval)
+			                    {
+			                        ShowProgress("Exported {0} documents", totalCount);
+			                        lastReport = SystemTime.UtcNow;
+			                    }
 
-				ShowProgress("Done with reading documents, total: {0}", totalCount);
+			                    if (watch.ElapsedMilliseconds > 100)
+			                        errorcount++;
+			                    watch.Start();
+			                }
+			            }
+			        
+			            if (hasDocs)
+			                continue;
+
+			            // The server can filter all the results. In this case, we need to try to go over with the next batch.
+			            // Note that if the ETag' server restarts number is not the same, this won't guard against an infinite loop.
+                        // (This code provides support for legacy RavenDB version: 1.0)
+			            var databaseStatistics = await GetStats();
+			            var lastEtagComparable = new ComparableByteArray(lastEtag);
+			            if (lastEtagComparable.CompareTo(databaseStatistics.LastDocEtag) < 0)
+			            {
+                            lastEtag = EtagUtil.Increment(lastEtag, maxRecords);
+			                ShowProgress("Got no results but didn't get to the last doc etag, trying from: {0}", lastEtag);
+
+			                continue;
+			            }
+                    }
+			    }
+                catch (Exception e)
+                {
+                    ShowProgress("Got Exception during smuggler export. Exception: {0}. ", e.Message);
+                    ShowProgress("Done with reading documents, total: {0}, lastEtag: {1}", totalCount, lastEtag);
+                    throw new SmugglerExportException(e.Message, e)
+                    {
+                        LastEtag = lastEtag,
+                    };
+                }
+
+			    ShowProgress("Done with reading documents, total: {0}, lastEtag: {1}", totalCount, lastEtag);
 				return lastEtag;
 			}
 		}
@@ -333,20 +392,18 @@ namespace Raven.Abstractions.Smuggler
 			if (files.Length == 0)
 				return;
 
-			var optionsWithoutIndexes = new SmugglerOptions
-											{
-												BackupPath = options.BackupPath,
-												Filters = options.Filters,
-												OperateOnTypes = options.OperateOnTypes & ~ItemType.Indexes
-											};
+		    var previousOperateOnTypes = options.OperateOnTypes;
+		    options.OperateOnTypes = options.OperateOnTypes & ~ItemType.Indexes;
 
 			for (var i = 0; i < files.Length - 1; i++)
 			{
 				using (var fileStream = File.OpenRead(Path.Combine(options.BackupPath, files[i])))
 				{
-					await ImportData(fileStream, optionsWithoutIndexes);
+					await ImportData(fileStream, options);
 				}
 			}
+
+		    options.OperateOnTypes = previousOperateOnTypes;
 
 			using (var fileStream = File.OpenRead(Path.Combine(options.BackupPath, files.Last())))
 			{
@@ -552,6 +609,7 @@ namespace Raven.Abstractions.Smuggler
 
 		private async Task<int> ImportDocuments(JsonTextReader jsonReader, SmugglerOptions options)
 		{
+		    var now = SystemTime.UtcNow;
 			var count = 0;
 
 			if (jsonReader.Read() == false)
@@ -579,6 +637,9 @@ namespace Raven.Abstractions.Smuggler
 					continue;
 				if (options.MatchFilters(document) == false)
 					continue;
+
+                if (options.ShouldExcludeExpired && options.ExcludeExpired(document, now))
+                    continue;
 
 				if (!string.IsNullOrEmpty(options.TransformScript))
 					document = await TransformDocument(document, options.TransformScript);
@@ -670,9 +731,7 @@ namespace Raven.Abstractions.Smuggler
 			var serverVersion = await GetVersion();
 			if (string.IsNullOrEmpty(serverVersion))
 			{
-				IsTransformersSupported = false;
-				IsDocsStreamingSupported = false;
-				ShowProgress("Server version is not available. Running in legacy mode which does not support transformers.");
+				SetLegacyMode();
 				return;
 			}
 
@@ -695,6 +754,13 @@ namespace Raven.Abstractions.Smuggler
 
 			IsTransformersSupported = true;
 			IsDocsStreamingSupported = true;
+		}
+
+		private void SetLegacyMode()
+		{
+			IsTransformersSupported = false;
+			IsDocsStreamingSupported = false;
+			ShowProgress("Server version is not available. Running in legacy mode which does not support transformers.");
 		}
 
 		public bool IsTransformersSupported { get; private set; }

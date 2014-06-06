@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Isam.Esent.Interop;
 using Raven.Abstractions;
+using Raven.Abstractions.Connection;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Extensions;
@@ -134,27 +135,28 @@ namespace Raven.Storage.Esent.StorageActions
 			}
 		}
 
-		private bool TryMoveTableRecords(Table table, int start, bool backward)
-		{
-			if (start <= 0)
-				return false;
-			if (backward)
-				start *= -1;
-			try
-			{
-				Api.JetMove(session, table, start, MoveGrbit.None);
-			}
-			catch (EsentErrorException e)
-			{
-				if (e.Error == JET_err.NoCurrentRecord)
-				{
-					return true;
-				}
-				throw;
-			}
-			return false;
-		}
-
+        private bool TryMoveTableRecords(Table table, int start, bool backward)
+        {
+            if (start <= 0)
+                return false;
+            if (start == int.MaxValue)
+                return true;
+            if (backward)
+                start *= -1;
+            try
+            {
+                Api.JetMove(session, table, start, MoveGrbit.None);
+            }
+            catch (EsentErrorException e)
+            {
+                if (e.Error == JET_err.NoCurrentRecord)
+                {
+                    return true;
+                }
+                throw;
+            }
+            return false;
+        }
 
 		private JsonDocument ReadCurrentDocument()
 		{
@@ -167,10 +169,14 @@ namespace Raven.Storage.Esent.StorageActions
 			RavenJObject dataAsJson;
 			using (Stream stream = new BufferedStream(new ColumnStream(session, Documents, tableColumnsCache.DocumentsColumns["data"])))
 			{
-				using (var aggregate = documentCodecs.Aggregate(stream, (bytes, codec) => codec.Decode(key, metadata, bytes)))
+				using (var aggregateStream = documentCodecs.Aggregate(stream, (bytes, codec) => codec.Decode(key, metadata, bytes)))
 				{
-					dataAsJson = aggregate.ToJObject();
-					docSize = (int)stream.Position;
+					var streamInUse = aggregateStream;
+					if (streamInUse != stream)
+						streamInUse = new CountingStream(aggregateStream);
+
+					dataAsJson = streamInUse.ToJObject();
+					docSize = (int)Math.Max(streamInUse.Position,stream.Position);
 				}
 			}
 
@@ -323,42 +329,6 @@ namespace Raven.Storage.Esent.StorageActions
 			etagTouches.Add(preTouchEtag, afterTouchEtag);
 		}
 
-		public AddDocumentResult PutDocumentMetadata(string key, RavenJObject metadata)
-		{
-			Api.JetSetCurrentIndex(session, Documents, "by_key");
-			Api.MakeKey(session, Documents, key, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			var isUpdate = Api.TrySeek(session, Documents, SeekGrbit.SeekEQ);
-			if (isUpdate == false)
-				throw new InvalidOperationException("Updating document metadata is only valid for existing documents, but " + key +
-													" does not exists");
-
-			Etag newEtag = uuidGenerator.CreateSequentialUuid(UuidType.Documents);
-			DateTime savedAt = SystemTime.UtcNow;
-			using (var update = new Update(session, Documents, JET_prep.Replace))
-			{
-				Api.SetColumn(session, Documents, tableColumnsCache.DocumentsColumns["etag"], newEtag.TransformToValueForEsentSorting());
-				Api.SetColumn(session, Documents, tableColumnsCache.DocumentsColumns["last_modified"], savedAt.ToBinary());
-
-				using (var columnStream = new ColumnStream(session, Documents, tableColumnsCache.DocumentsColumns["metadata"]))
-				{
-					columnStream.SetLength(0); // always updating here
-					using (Stream stream = new BufferedStream(columnStream))
-					{
-						metadata.WriteTo(stream);
-						stream.Flush();
-					}
-				}
-
-				update.Save();
-			}
-			return new AddDocumentResult
-			{
-				Etag = newEtag,
-				SavedAt = savedAt,
-				Updated = true
-			};
-		}
-
 		public void IncrementDocumentCount(int value)
 		{
 			if (Api.TryMoveFirst(session, Details))
@@ -367,7 +337,9 @@ namespace Raven.Storage.Esent.StorageActions
 
 		public AddDocumentResult AddDocument(string key, Etag etag, RavenJObject data, RavenJObject metadata)
 		{
-			if (key != null && Encoding.Unicode.GetByteCount(key) >= 2048)
+		    if (key == null) throw new ArgumentNullException("key");
+		    var byteCount = Encoding.Unicode.GetByteCount(key);
+		    if (byteCount >= 2048)
 				throw new ArgumentException(string.Format("The key must be a maximum of 2,048 bytes in Unicode, 1,024 characters, key is: '{0}'", key), "key");
 
 			try
@@ -376,19 +348,6 @@ namespace Raven.Storage.Esent.StorageActions
 				Api.JetSetCurrentIndex(session, Documents, "by_key");
 				Api.MakeKey(session, Documents, key, Encoding.Unicode, MakeKeyGrbit.NewKey);
 				var isUpdate = Api.TrySeek(session, Documents, SeekGrbit.SeekEQ);
-				if (isUpdate)
-				{
-					// need to check for keys > 127 
-					var keyFromDb = Api.RetrieveColumnAsString(session, Documents,
-															   tableColumnsCache.DocumentsColumns["key"]);
-
-					if (string.Equals(keyFromDb, key, StringComparison.OrdinalIgnoreCase) == false)
-					{
-						throw new NotSupportedException("Got a request to update a document with id [" + key + "] that matches already existing document [" + keyFromDb +
-							"] in the first 127 chars. Unfortunately, Esent doesn't allow such keys and this isn't supported.");
-					}
-
-				}
 
 				Etag existingEtag = null;
 				if (isUpdate)

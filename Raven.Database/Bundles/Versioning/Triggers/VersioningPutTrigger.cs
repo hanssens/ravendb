@@ -6,6 +6,7 @@
 using System;
 using System.ComponentModel.Composition;
 using System.Linq;
+using System.Threading;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
 using Raven.Bundles.Versioning.Data;
@@ -24,9 +25,9 @@ namespace Raven.Bundles.Versioning.Triggers
 			if (jsonDocument == null)
 				return VetoResult.Allowed;
 
-            if (Database.ChangesToRevisionsAllowed() == false && 
-                jsonDocument.Metadata.Value<string>(VersioningUtil.RavenDocumentRevisionStatus) == "Historical" &&
-                Database.IsVersioningActive(metadata))
+			if (Database.ChangesToRevisionsAllowed() == false && 
+				jsonDocument.Metadata.Value<string>(VersioningUtil.RavenDocumentRevisionStatus) == "Historical" &&
+				Database.IsVersioningActive(metadata))
 			{
 				return VetoResult.Deny("Modifying a historical revision is not allowed");
 			}
@@ -37,7 +38,14 @@ namespace Raven.Bundles.Versioning.Triggers
 		public override void OnPut(string key, RavenJObject document, RavenJObject metadata, TransactionInformation transactionInformation)
 		{
 			VersioningConfiguration versioningConfiguration;
-			if (TryGetVersioningConfiguration(key, document, metadata, out versioningConfiguration) == false)
+
+			if (metadata.ContainsKey(Constants.RavenCreateVersion))
+			{
+				metadata.__ExternalState[Constants.RavenCreateVersion] = metadata[Constants.RavenCreateVersion];
+				metadata.Remove(Constants.RavenCreateVersion);
+			}
+
+			if (TryGetVersioningConfiguration(key, metadata, out versioningConfiguration) == false)
 				return;
 
 			var revision = GetNextRevisionNumber(key);
@@ -57,7 +65,7 @@ namespace Raven.Bundles.Versioning.Triggers
 		public override void AfterPut(string key, RavenJObject document, RavenJObject metadata, Etag etag, TransactionInformation transactionInformation)
 		{
 			VersioningConfiguration versioningConfiguration;
-			if (TryGetVersioningConfiguration(key, document, metadata, out versioningConfiguration) == false)
+			if (TryGetVersioningConfiguration(key, metadata, out versioningConfiguration) == false)
 				return;
 
 			using (Database.DisableAllTriggersForCurrentThread())
@@ -132,7 +140,7 @@ namespace Raven.Bundles.Versioning.Triggers
 
 			while (true)
 			{
-				var docs = Database.GetDocumentsWithIdStartingWith(key + "/revisions/", null, null, start, pageSize);
+				var docs = Database.GetDocumentsWithIdStartingWith(key + "/revisions/", null, null, start, pageSize, CancellationToken.None);
 				if (!docs.Any())
 					break;
 
@@ -147,7 +155,7 @@ namespace Raven.Bundles.Versioning.Triggers
 			return lastRevisionDoc;
 		}
 
-		private bool TryGetVersioningConfiguration(string key, RavenJObject document, RavenJObject metadata,
+		private bool TryGetVersioningConfiguration(string key, RavenJObject metadata,
 												   out VersioningConfiguration versioningConfiguration)
 		{
 			versioningConfiguration = null;
@@ -158,16 +166,11 @@ namespace Raven.Bundles.Versioning.Triggers
 				return false;
 
 			versioningConfiguration = Database.GetDocumentVersioningConfiguration(metadata);
-			if (versioningConfiguration == null || versioningConfiguration.Exclude)
+			if (versioningConfiguration == null || versioningConfiguration.Exclude
+				|| (versioningConfiguration.ExcludeUnlessExplicit && !metadata.__ExternalState.ContainsKey(Constants.RavenCreateVersion)))
 				return false;
-
-		    return VersionThisUpdate(key, document, metadata);
+			return true;
 		}
-
-        protected virtual bool VersionThisUpdate(string key, RavenJObject document, RavenJObject metadata)
-        {
-            return true;
-        }
 
 		private void RemoveOldRevisions(string key, int revision, VersioningConfiguration versioningConfiguration, TransactionInformation transactionInformation)
 		{

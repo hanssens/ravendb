@@ -142,13 +142,22 @@ namespace Raven.Database.Indexing
 							indexImplementation.Priority = indexStats.Priority;
 						}
 
-
 						var read = accessor.Lists.Read("Raven/Indexes/QueryTime", fixedName);
 						if (read == null)
+						{
+							if(IsIdleAutoIndex(indexImplementation))
+								indexImplementation.MarkQueried(); // prevent index abandoning right after startup
+
 							return;
+						}
 
 						var dateTime = read.Data.Value<DateTime>("LastQueryTime");
-						indexImplementation.MarkQueried(dateTime);
+
+						if(IsIdleAutoIndex(indexImplementation) && SystemTime.UtcNow - dateTime > configuration.TimeToWaitBeforeRunningAbandonedIndexes)
+							indexImplementation.MarkQueried(); // prevent index abandoning right after startup
+						else
+							indexImplementation.MarkQueried(dateTime);
+						
 						if (dateTime > latestPersistedQueryTime)
 							latestPersistedQueryTime = dateTime;
 					});
@@ -175,6 +184,11 @@ namespace Raven.Database.Indexing
 				}
 			}
 			indexes.TryAdd(fixedName, indexImplementation);
+		}
+
+		private static bool IsIdleAutoIndex(Index index)
+		{
+			return index.name.StartsWith("Auto/") && index.Priority == IndexingPriority.Idle;
 		}
 
 		private void TryResettingIndex(string indexName, IndexDefinition indexDefinition)
@@ -279,7 +293,9 @@ namespace Raven.Database.Indexing
 			Lucene.Net.Store.Directory directory;
 			if (configuration.RunInMemory ||
 				(indexDefinition.IsMapReduce == false &&  // there is no point in creating map/reduce indexes in memory, we write the intermediate results to disk anyway
-				 indexDefinitionStorage.IsNewThisSession(indexDefinition)))
+				 indexDefinitionStorage.IsNewThisSession(indexDefinition) &&
+				 indexDefinition.DisableInMemoryIndexing == false &&
+				 configuration.DisableInMemoryIndexing == false))
 			{
 				directory = new RAMDirectory();
 				new IndexWriter(directory, dummyAnalyzer, IndexWriter.MaxFieldLength.UNLIMITED).Dispose(); // creating index structure
@@ -726,12 +742,7 @@ namespace Raven.Database.Indexing
 			return new Index.IndexQueryOperation(value, query, _ => false, fieldsToFetch, indexQueryTriggers).GetLuceneQuery();
 		}
 
-		public IEnumerable<IndexQueryResult> Query(
-			string index,
-			IndexQuery query,
-			Func<IndexQueryResult, bool> shouldIncludeInResults,
-			FieldsToFetch fieldsToFetch,
-			OrderedPartCollection<AbstractIndexQueryTrigger> indexQueryTriggers)
+		public IEnumerable<IndexQueryResult> Query(string index, IndexQuery query, Func<IndexQueryResult, bool> shouldIncludeInResults, FieldsToFetch fieldsToFetch, OrderedPartCollection<AbstractIndexQueryTrigger> indexQueryTriggers, CancellationToken token)
 		{
 			Index value;
 			if (indexes.TryGetValue(index, out value) == false)
@@ -768,10 +779,10 @@ namespace Raven.Database.Indexing
 
 			var indexQueryOperation = new Index.IndexQueryOperation(value, query, shouldIncludeInResults, fieldsToFetch, indexQueryTriggers);
 			if (query.Query != null && query.Query.Contains(Constants.IntersectSeparator))
-				return indexQueryOperation.IntersectionQuery();
+				return indexQueryOperation.IntersectionQuery(token);
 
 
-			return indexQueryOperation.Query();
+			return indexQueryOperation.Query(token);
 		}
 
 		public IEnumerable<RavenJObject> IndexEntires(
@@ -1041,9 +1052,9 @@ namespace Raven.Database.Indexing
 		{
 			// relatively young index, haven't been queried for a while already
 			// can be safely removed, probably
-			if (age < 90 && lastQuery < 30)
+			if (age < 90 && lastQuery > 30)
 			{
-                accessor.Indexing.DeleteIndex(thisItem.Name, documentDatabase.WorkContext.CancellationToken);
+				documentDatabase.DeleteIndex(thisItem.Name);
 				return;
 			}
 

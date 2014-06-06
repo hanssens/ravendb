@@ -549,6 +549,11 @@ namespace Raven.Client.Document
 			{
 				var oauthSource = unauthorizedResponse.Headers["OAuth-Source"];
 
+#if DEBUG && FIDDLER
+				// Make sure to avoid a cross DNS security issue, when running with Fiddler
+				oauthSource = oauthSource.Replace("localhost:", "localhost.fiddler:");
+#endif
+
 				if (string.IsNullOrEmpty(oauthSource) == false &&
 					oauthSource.EndsWith("/OAuth/API-Key", StringComparison.CurrentCultureIgnoreCase) == false)
 				{
@@ -564,7 +569,7 @@ namespace Raven.Client.Document
 				if (string.IsNullOrEmpty(oauthSource))
 					oauthSource = this.Url + "/OAuth/API-Key";
 
-				return securedAuthenticator.DoOAuthRequestAsync(Url, oauthSource, credentials.ApiKey);
+				return securedAuthenticator.DoOAuthRequestAsync(oauthSource, credentials.ApiKey);
 			};
 
 		}

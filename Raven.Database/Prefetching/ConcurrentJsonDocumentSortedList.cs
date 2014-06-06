@@ -1,4 +1,5 @@
-﻿#if !SILVERLIGHT
+﻿using System;
+#if !SILVERLIGHT
 // -----------------------------------------------------------------------
 //  <copyright file="ConcurrentOrderedList.cs" company="Hibernating Rhinos LTD">
 //      Copyright (c) Hibernating Rhinos LTD. All rights reserved.
@@ -131,6 +132,19 @@ namespace Raven.Database.Prefetching
 				slim.ExitReadLock();
 			}
 		}
+
+	    public T Aggregate<T>(T seed, Func<T, JsonDocument, T> aggregate)
+	    {
+            slim.EnterReadLock();
+	        try
+	        {
+	            return innerList.Aggregate(seed, aggregate);
+	        }
+	        finally
+	        {
+	            slim.ExitReadLock();
+	        }
+	    }
 	}
 }
 #endif

@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Raven.Client;
 using Raven.Client.Indexes;
 using Xunit;
-using Xunit.Sdk;
-using Raven.Client;
 
 namespace Raven.Tests.Indexes
 {
@@ -76,7 +75,7 @@ namespace Raven.Tests.Indexes
                     session.SaveChanges();
                 }
 
-                WaitForIndexing(store);
+                WaitForIndexing(store, timeout: TimeSpan.FromSeconds(10));
             }
         }
 

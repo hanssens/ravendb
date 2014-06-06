@@ -10,6 +10,7 @@ using Microsoft.WindowsAzure.Storage.Auth;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Raven.Abstractions;
 using Raven.Abstractions.Data;
+using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Extensions;
 using Raven.Abstractions.Logging;
 using Raven.Abstractions.Smuggler;
@@ -151,9 +152,27 @@ namespace Raven.Database.Bundles.PeriodicBackups
 								LastAttachmentEtag = localBackupStatus.LastAttachmentsEtag
 							};
 							var dd = new DataDumper(documentDatabase, options);
-							var filePath = await dd.ExportData(null, null, true, backupStatus);
+						    string filePath;
+						    try
+						    {
+						        filePath = await dd.ExportData(null, null, true, backupStatus);
+						    }
+						    catch (SmugglerExportException e)
+						    {
+						        filePath = e.File;
+                                logger.ErrorException("Recoverable error when performing periodic backup", e);
+                                Database.AddAlert(new Alert
+                                {
+                                    AlertLevel = AlertLevel.Error,
+                                    CreatedAt = SystemTime.UtcNow,
+                                    Message = e.Message,
+                                    Title = "Recoverable Error in Periodic Backup",
+                                    Exception = e.ToString(),
+                                    UniqueKey = "Periodic Backup Error",
+                                });
+						    }
 
-							// No-op if nothing has changed
+						    // No-op if nothing has changed
 							if (options.LastDocsEtag == localBackupStatus.LastDocsEtag &&
 							    options.LastAttachmentEtag == localBackupStatus.LastAttachmentsEtag)
 							{
@@ -167,7 +186,11 @@ namespace Raven.Database.Bundles.PeriodicBackups
 							}
 							finally
 							{
-								IOExtensions.DeleteDirectory(filePath);
+                                // we delete file only with some upload option was selected
+                                if (string.IsNullOrEmpty(localBackupConfigs.LocalFolderName))
+                                {
+                                    File.Delete(filePath);    
+                                }
 							}
 
 							localBackupStatus.LastAttachmentsEtag = options.LastAttachmentEtag;

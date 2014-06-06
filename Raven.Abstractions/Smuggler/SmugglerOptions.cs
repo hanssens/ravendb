@@ -14,9 +14,16 @@ using System.Linq;
 
 namespace Raven.Abstractions.Smuggler
 {
-	public class SmugglerOptions
+    using System.Text.RegularExpressions;
+
+    public class SmugglerOptions
 	{
 		public string TransformScript { get; set; }
+
+        /// <summary>
+        /// Maximum number of steps that transform script can have
+        /// </summary>
+        public int MaxStepsForTransformScript { get; set; }
 
 		public SmugglerOptions()
 		{
@@ -25,7 +32,9 @@ namespace Raven.Abstractions.Smuggler
 			Timeout = 30 * 1000; // 30 seconds
 			BatchSize = 1024;
 			ShouldExcludeExpired = false;
+		    Limit = int.MaxValue;
 			LastAttachmentEtag = LastDocsEtag = Etag.Empty;
+		    MaxStepsForTransformScript = 10*1000;
 		}
 
 		/// <summary>
@@ -37,6 +46,8 @@ namespace Raven.Abstractions.Smuggler
 
 		public Etag LastDocsEtag { get; set; }
 		public Etag LastAttachmentEtag { get; set; }
+
+        public int Limit { get; set; }
 
 		/// <summary>
 		/// Specify the types to operate on. You can specify more than one type by combining items with the OR parameter.
@@ -68,17 +79,25 @@ namespace Raven.Abstractions.Smuggler
 		{
 			foreach (var filter in Filters)
 			{
+			    bool anyRecords = false;
 				bool matchedFilter = false;
 				foreach (var tuple in item.SelectTokenWithRavenSyntaxReturningFlatStructure(filter.Path))
 				{
 					if (tuple == null || tuple.Item1 == null)
 						continue;
+
+				    anyRecords = true;
+
 					var val = tuple.Item1.Type == JTokenType.String
 								? tuple.Item1.Value<string>()
 								: tuple.Item1.ToString(Formatting.None);
 					matchedFilter |= filter.Values.Any(value => String.Equals(val, value, StringComparison.OrdinalIgnoreCase)) ==
 									 filter.ShouldMatch;
 				}
+
+                if (filter.ShouldMatch == false && anyRecords == false) // RDBQA-7
+                    return true;
+
 				if (matchedFilter == false)
 					return false;
 			}
@@ -90,7 +109,7 @@ namespace Raven.Abstractions.Smuggler
 		/// </summary>
 		public bool ShouldExcludeExpired { get; set; }
 
-		public virtual bool ExcludeExpired(RavenJToken item)
+		public virtual bool ExcludeExpired(RavenJToken item, DateTime now)
 		{
 			var metadata = item.Value<RavenJObject>("@metadata");
 
@@ -115,7 +134,7 @@ namespace Raven.Abstractions.Smuggler
 				return false;
 			}
 
-			return dateTime >= SystemTime.UtcNow;
+            return dateTime < now;
 		}
 	}
 
@@ -140,5 +159,28 @@ namespace Raven.Abstractions.Smuggler
 		{
 			Values = new List<string>();
 		}
+
+        private static readonly Regex Regex = new Regex(@"('[^']+'|[^,]+)");
+
+	    public static List<string> ParseValues(string value)
+	    {
+            var results = new List<string>();
+
+            if (string.IsNullOrEmpty(value))
+                return results;
+
+	        var matches = Regex.Matches(value);
+	        for (var i = 0; i < matches.Count; i++)
+	        {
+	            var match = matches[i].Value;
+	            
+	            if (match.StartsWith("'") && match.EndsWith("'"))
+                    match = match.Substring(1, match.Length - 2);
+
+                results.Add(match);
+	        }
+
+	        return results;
+	    }
 	}
 }

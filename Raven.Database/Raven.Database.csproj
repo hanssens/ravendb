@@ -204,9 +204,11 @@
     <Compile Include="Bundles\SqlReplication\RelationalDatabaseWriter.cs" />
     <Compile Include="Bundles\SqlReplication\SqlReplicationScriptedJsonPatcher.cs" />
     <Compile Include="Bundles\SqlReplication\SqlReplicationStatistics.cs" />
+    <Compile Include="Extensions\CancellationTokenSource.cs" />
     <Compile Include="Impl\DTC\EsentInFlightTransactionalState.cs" />
     <Compile Include="Impl\DTC\EsentTransactionContext.cs" />
     <Compile Include="Impl\DTC\MuninInFlightTransactionalState.cs" />
+    <Compile Include="Impl\PutSerialLock.cs" />
     <Compile Include="Indexing\IndependentBatchSizeAutoTuner.cs" />
     <Compile Include="Indexing\IndexReaderWarmersWrapper.cs" />
     <Compile Include="Linq\AttachmentForIndexing.cs" />
@@ -228,10 +230,7 @@
     <Compile Include="Extensions\ConcurrentQueueExtensions.cs" />
     <Compile Include="Extensions\DocDbExtensions.cs" />
     <Compile Include="Extensions\TaskExtensions.cs" />
-    <Compile Include="Impl\Synchronization\DatabaseEtagSynchronizer.cs" />
     <Compile Include="Impl\DTC\InFlightTransactionalState.cs" />
-    <Compile Include="Impl\Synchronization\EtagSynchronizer.cs" />
-    <Compile Include="Impl\Synchronization\EtagSynchronizerType.cs" />
     <Compile Include="Imports\Lucene.Net\FastVectorHightlighter\BaseFragmentsBuilder.cs" />
     <Compile Include="Imports\Lucene.Net\FastVectorHightlighter\FastVectorHighlighter.cs" />
     <Compile Include="Imports\Lucene.Net\FastVectorHightlighter\FieldFragList.cs" />
@@ -758,6 +757,7 @@
     <Compile Include="Storage\Esent\SchemaUpdates\Updates\From44To45.cs" />
     <Compile Include="Storage\Esent\SchemaUpdates\Updates\From45To46.cs" />
     <Compile Include="Storage\Esent\SchemaUpdates\Updates\From46To47.cs" />
+    <Compile Include="Storage\Esent\SchemaUpdates\Updates\From47To48.cs" />
     <Compile Include="Storage\Esent\StorageActionsAccessor.cs" />
     <Compile Include="Storage\Esent\StorageActions\Documents.cs" />
     <Compile Include="Storage\Esent\StorageActions\DocumentStorageActions.cs" />
@@ -835,10 +835,16 @@
     <Compile Include="Tasks\TouchMissingReferenceDocumentTask.cs" />
     <Compile Include="Util\ActiveEnumerable.cs" />
     <Compile Include="Util\DatabaseMemoryTarget.cs" />
+    <Compile Include="Util\IPerformanceCounter.cs" />
+    <Compile Include="Util\NoOpPerformanceCounter.cs" />
     <Compile Include="Util\OutputTicker.cs" />
+    <Compile Include="Util\PerformanceCounterAttribute.cs" />
+    <Compile Include="Util\PerformanceCountersManager.cs" />
     <Compile Include="Util\PerformanceCountersUtils.cs" />
+    <Compile Include="Util\PerformanceCounterWrapper.cs" />
     <Compile Include="Util\PortUtil.cs" />
     <Compile Include="Util\SequentialUuidGenerator.cs" />
+    <Compile Include="Util\SortedKeyList.cs" />
     <Compile Include="Util\Streams\BufferPool.cs" />
     <Compile Include="Util\Streams\BufferPoolStream.cs" />
     <Compile Include="Util\Streams\PartialStream.cs" />

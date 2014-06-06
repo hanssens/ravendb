@@ -97,7 +97,6 @@ namespace Raven.Database.Indexing
 
 		private IEnumerable<AbstractField> CreateRegularFields(string name, object value, Field.Store defaultStorage, bool nestedArray = false, Field.TermVector defaultTermVector = Field.TermVector.NO, Field.Index? analyzed = null)
 		{
-
             var fieldIndexingOptions = analyzed ?? indexDefinition.GetIndex(name, null);
 			var storage = indexDefinition.GetStorage(name, defaultStorage);
 			var termVector = indexDefinition.GetTermVector(name, defaultTermVector);
@@ -111,7 +110,6 @@ namespace Raven.Database.Indexing
 			{
 				fieldIndexingOptions = Field.Index.ANALYZED; // we have some sort of term vector, forcing index to be analyzed, then.
 			}
-
 
 			if (value == null)
 			{
@@ -165,17 +163,17 @@ namespace Raven.Database.Indexing
 				if (dynamicNullObject.IsExplicitNull)
 				{
 					var sortOptions = indexDefinition.GetSortOption(name);
-					if (sortOptions != null && 
-                        sortOptions.Value != SortOptions.None && 
-                        sortOptions.Value != SortOptions.String && 
-                        sortOptions.Value != SortOptions.StringVal && 
-                        sortOptions.Value != SortOptions.Custom)
-					{
-						yield break; // we don't emit null for sorting	
-					}
-					yield return CreateFieldWithCaching(name, Constants.NullValue, storage,
-														Field.Index.NOT_ANALYZED_NO_NORMS, Field.TermVector.NO);
-				}
+				    if (sortOptions == null || sortOptions.Value == SortOptions.None || sortOptions.Value == SortOptions.String ||
+				        sortOptions.Value == SortOptions.StringVal || sortOptions.Value == SortOptions.Custom)
+				    {
+                        yield return CreateFieldWithCaching(name, Constants.NullValue, storage,
+                                                      Field.Index.NOT_ANALYZED_NO_NORMS, Field.TermVector.NO);
+				    }
+
+				    foreach (var field in CreateNumericFieldWithCaching(name, GetNullValueForSorting(sortOptions), storage, termVector))
+                        yield return field;
+                   
+                 }
 				yield break;
 			}
 			var boostedValue = value as BoostedValue;
@@ -207,27 +205,24 @@ namespace Raven.Database.Indexing
 			var itemsToIndex = value as IEnumerable;
 			if (itemsToIndex != null && ShouldTreatAsEnumerable(itemsToIndex))
 			{
-				var sentArrayField = false;
-				int count = 1;
+                int count = 1;
+
+                if (nestedArray == false)
+                    yield return new Field(name + "_IsArray", "true", storage, Field.Index.NOT_ANALYZED_NO_NORMS, Field.TermVector.NO);
+
 				foreach (var itemToIndex in itemsToIndex)
 				{
-					if (nestedArray == false && !Equals(storage, Field.Store.NO) && sentArrayField == false)
-					{
-						sentArrayField = true;
-						yield return new Field(name + "_IsArray", "true", Field.Store.YES, Field.Index.NOT_ANALYZED_NO_NORMS, Field.TermVector.NO);
-					}
+				    if (!CanCreateFieldsForNestedArray(itemToIndex, fieldIndexingOptions))
+				        continue;
 
-					if (CanCreateFieldsForNestedArray(itemToIndex, fieldIndexingOptions))
-					{
-						multipleItemsSameFieldCount.Add(count++);
-						foreach (var field in CreateFields(name, itemToIndex, storage, nestedArray: true, defaultTermVector: defaultTermVector, analyzed: analyzed))
-						{
-							yield return field;
-						}
-						multipleItemsSameFieldCount.RemoveAt(multipleItemsSameFieldCount.Count - 1);
-					}
+				    multipleItemsSameFieldCount.Add(count++);
+				    foreach (var field in CreateFields(name, itemToIndex, storage, nestedArray: true, defaultTermVector: defaultTermVector, analyzed: analyzed))
+				        yield return field;
+
+				    multipleItemsSameFieldCount.RemoveAt(multipleItemsSameFieldCount.Count - 1);
 				}
-				yield break;
+
+			    yield break;
 			}
 
 			if (Equals(fieldIndexingOptions, Field.Index.NOT_ANALYZED) ||
@@ -333,7 +328,34 @@ namespace Raven.Database.Indexing
 				yield return numericField;
 		}
 
-		private IEnumerable<AbstractField> CreateNumericFieldWithCaching(string name, object value,
+	    private static object GetNullValueForSorting(SortOptions? sortOptions)
+	    {
+	        switch (sortOptions)
+	        {
+	            case SortOptions.Short:
+	            case SortOptions.Int:
+	                return int.MinValue;
+	            case SortOptions.Double:
+	                return double.MinValue;
+	                break;
+	            case SortOptions.Float:
+	                return float.MinValue;
+
+// ReSharper disable RedundantCaseLabel
+	            case SortOptions.Long:
+
+	            // to be able to sort on timestamps
+	            case SortOptions.String:
+	            case SortOptions.StringVal:
+	            case SortOptions.None:
+	            case SortOptions.Custom:
+// ReSharper restore RedundantCaseLabel
+	            default:
+	                return long.MinValue;
+	        }
+	    }
+
+	    private IEnumerable<AbstractField> CreateNumericFieldWithCaching(string name, object value,
 			Field.Store defaultStorage, Field.TermVector termVector)
 		{
 
@@ -349,7 +371,6 @@ namespace Raven.Database.Indexing
 			if (value is TimeSpan)
 			{
 				yield return numericField.SetLongValue(((TimeSpan)value).Ticks);
-
 			}
 			else if (value is int)
 			{

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Specialized;
 using System.IO;
 using System.Runtime.Caching;
+using Raven.Abstractions.Data;
 using Raven.Database.Config.Settings;
 
 namespace Raven.Database.Config
@@ -22,6 +23,12 @@ namespace Raven.Database.Config
 
 		public void Setup(int defaultMaxNumberOfItemsToIndexInSingleBatch, int defaultInitialNumberOfItemsToIndexInSingleBatch)
 		{
+			MemoryLimitForIndexing = new IntegerSetting(settings[Constants.MemoryLimitForIndexing],
+                // we allow 1 GB by default, or up to 75% of available memory on startup, if less than that is available
+                Math.Min(1024, (int)(MemoryStatistics.AvailableMemory * 0.75))); 
+
+		    EncryptionKeyBitsPreference = new IntegerSetting(settings[Constants.EncryptionKeyBitsPreferenceSetting],
+		        Constants.DefaultKeySizeToUseInActualEncryptionInBits);
 			MaxPageSize =
 				new IntegerSettingWithMin(settings["Raven/MaxPageSize"], 1024, 10);
 			MemoryCacheLimitMegabytes =
@@ -34,6 +41,16 @@ namespace Raven.Database.Config
 			MemoryCacheLimitCheckInterval =
 				new TimeSpanSetting(settings["Raven/MemoryCacheLimitCheckInterval"], MemoryCache.Default.PollingInterval,
 				                    TimeSpanArgumentType.FromParse);
+
+            PrewarmFacetsSyncronousWaitTime =
+                new TimeSpanSetting(settings["Raven/PrewarmFacetsSyncronousWaitTime"], TimeSpan.FromSeconds(3),
+                                    TimeSpanArgumentType.FromParse);
+
+            PrewarmFacetsOnIndexingMaxAge =
+                new TimeSpanSetting(settings["Raven/PrewarmFacetsOnIndexingMaxAge"], TimeSpan.FromMinutes(10),
+                                    TimeSpanArgumentType.FromParse);
+			
+			
 			MaxIndexingRunLatency =
 				new TimeSpanSetting(settings["Raven/MaxIndexingRunLatency"], TimeSpan.FromMinutes(5),
 				                    TimeSpanArgumentType.FromParse);
@@ -41,6 +58,8 @@ namespace Raven.Database.Config
 				new IntegerSetting(settings["Raven/MaxIndexWritesBeforeRecreate"], 256 * 1024);
 			PreventAutomaticSuggestionCreation =
 				new BooleanSetting(settings["Raven/PreventAutomaticSuggestionCreation"], false);
+			DisablePerformanceCounters =
+				new BooleanSetting(settings["Raven/DisablePerformanceCounters"], false);
 
 			MaxNumberOfItemsToIndexInSingleBatch =
 				new IntegerSettingWithMin(settings["Raven/MaxNumberOfItemsToIndexInSingleBatch"],
@@ -64,6 +83,8 @@ namespace Raven.Database.Config
 				new BooleanSetting(settings["Raven/CreateAutoIndexesForAdHocQueriesIfNeeded"], true);
 			ResetIndexOnUncleanShutdown =
 				new BooleanSetting(settings["Raven/ResetIndexOnUncleanShutdown"], false);
+			DisableInMemoryIndexing =
+				new BooleanSetting(settings["Raven/DisableInMemoryIndexing"], false);
 			DataDir =
 				new StringSetting(settings["Raven/DataDir"], @"~\Data");
 			IndexStoragePath =
@@ -111,6 +132,8 @@ namespace Raven.Database.Config
 				                    TimeSpanArgumentType.FromParse);
             
 			TimeToWaitBeforeRunningIdleIndexes = new TimeSpanSetting(settings["Raven/TimeToWaitBeforeRunningIdleIndexes"], TimeSpan.FromMinutes(10), TimeSpanArgumentType.FromParse);
+
+			DatbaseOperationTimeout = new TimeSpanSetting(settings["Raven/DatbaseOperationTimeout"], TimeSpan.FromMinutes(5), TimeSpanArgumentType.FromParse);
             
 			TimeToWaitBeforeMarkingAutoIndexAsIdle = new TimeSpanSetting(settings["Raven/TimeToWaitBeforeMarkingAutoIndexAsIdle"], TimeSpan.FromHours(1), TimeSpanArgumentType.FromParse);
 
@@ -125,9 +148,10 @@ namespace Raven.Database.Config
 
 			MaxStepsForScript = new IntegerSetting(settings["Raven/MaxStepsForScript"], 10*1000);
 			AdditionalStepsForScriptBasedOnDocumentSize = new IntegerSetting(settings["Raven/AdditionalStepsForScriptBasedOnDocumentSize"], 5);
+
+			MaxRecentTouchesToRemember = new IntegerSetting(settings["Raven/MaxRecentTouchesToRemember"], 1024);
 		}
 
-	    
 		private string GetDefaultWebDir()
 		{
 			return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Raven/WebUI");
@@ -148,6 +172,10 @@ namespace Raven.Database.Config
 			return val;
 		}
 
+		public IntegerSetting MemoryLimitForIndexing { get; private set; }
+
+		public IntegerSetting EncryptionKeyBitsPreference { get; private set; }
+
 		public IntegerSettingWithMin MaxPageSize { get; private set; }
 
 		public IntegerSetting MemoryCacheLimitMegabytes { get; private set; }
@@ -160,7 +188,11 @@ namespace Raven.Database.Config
 
 		public TimeSpanSetting MaxIndexingRunLatency { get; private set; }
 
-		public IntegerSettingWithMin MaxNumberOfItemsToIndexInSingleBatch { get; private set; }
+        public TimeSpanSetting PrewarmFacetsOnIndexingMaxAge { get; private set; }
+
+        public TimeSpanSetting PrewarmFacetsSyncronousWaitTime { get; private set; }
+
+        public IntegerSettingWithMin MaxNumberOfItemsToIndexInSingleBatch { get; private set; }
 
 		public IntegerSetting AvailableMemoryForRaisingIndexBatchSizeLimit { get; private set; }
 
@@ -177,6 +209,8 @@ namespace Raven.Database.Config
 		public BooleanSetting CreateAutoIndexesForAdHocQueriesIfNeeded { get; private set; }
 
 		public BooleanSetting ResetIndexOnUncleanShutdown { get; private set; }
+
+		public BooleanSetting DisableInMemoryIndexing { get; private set; }
 
 		public StringSetting DataDir { get; private set; }
 
@@ -244,5 +278,10 @@ namespace Raven.Database.Config
 		public IntegerSetting MaxIndexWritesBeforeRecreate { get; private set; }
 
 		public BooleanSetting PreventAutomaticSuggestionCreation { get; set; }
+    
+        public BooleanSetting DisablePerformanceCounters { get; set; }
+		public TimeSpanSetting DatbaseOperationTimeout { get; private set; }
+
+		public IntegerSetting MaxRecentTouchesToRemember { get; set; }
 	}
 }

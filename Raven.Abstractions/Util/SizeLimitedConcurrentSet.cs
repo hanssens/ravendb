@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 #if !SILVERLIGHT
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,7 +25,9 @@ namespace Raven.Database.Util
 			dic = new ConcurrentDictionary<T, object>(equalityComparer);
 		}
 
-		public bool Add(T item)
+	    public int Count { get { return queue.Count; }}
+
+	    public bool Add(T item)
 		{
 			if (dic.TryAdd(item, null) == false)
 				return false;
@@ -56,6 +60,11 @@ namespace Raven.Database.Util
 		{
 			return queue.ToArray();
 		}
+
+	    public TAccumolate Aggregate<TAccumolate>(TAccumolate seed, Func<TAccumolate, T, TAccumolate> aggregate)
+	    {
+	        return queue.Aggregate(seed, aggregate);
+	    }
 	}
 }
 #endif

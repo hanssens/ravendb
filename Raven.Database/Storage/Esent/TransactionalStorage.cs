@@ -117,9 +117,12 @@ namespace Raven.Storage.Esent
 
         public void Dispose()
         {
-            disposerLock.EnterWriteLock();
+            var tryEnterWriteLock = disposerLock.TryEnterWriteLock(TimeSpan.FromMinutes(2));
             try
             {
+                if (tryEnterWriteLock == false)
+                    log.Warn( "After waiting for 2 minutes, could not aqcuire disposal lock, will force disposal anyway, pending transactions will all error");
+
                 if (disposed)
                     return;
 
@@ -134,7 +137,17 @@ namespace Raven.Storage.Esent
 
                 exceptionAggregator.Execute(() =>
                     {
-                        Api.JetTerm2(instance, TermGrbit.Complete);
+	                    try
+	                    {
+							Api.JetTerm2(instance, TermGrbit.Complete);
+	                    }
+						catch (EsentDiskIOException e)
+						{
+							log.ErrorException(
+								"Could not properly terminate Esent instance because of disk exception. Ignoring this error to allow to shutdown RavenDB instance.",
+								e);
+						}
+                        
                         GC.SuppressFinalize(this);
                     });
 
@@ -147,7 +160,8 @@ namespace Raven.Storage.Esent
             }
             finally
             {
-                disposerLock.ExitWriteLock();
+                if (tryEnterWriteLock)
+                    disposerLock.ExitWriteLock();
             }
         }
 
@@ -191,6 +205,8 @@ namespace Raven.Storage.Esent
 
         public long GetDatabaseTransactionVersionSizeInBytes()
         {
+            if (configuration.DisablePerformanceCounters)
+                return -4;
             if (getDatabaseTransactionVersionSizeInBytesErrorValue != 0)
                 return getDatabaseTransactionVersionSizeInBytesErrorValue;
 
@@ -201,7 +217,7 @@ namespace Raven.Storage.Esent
                     return getDatabaseTransactionVersionSizeInBytesErrorValue = -1;
                 var category = new PerformanceCounterCategory(categoryName);
                 var instances = category.GetInstanceNames();
-                var ravenInstance = instances.FirstOrDefault(x => x.StartsWith(uniquePrefix));
+                var ravenInstance = instances.FirstOrDefault(x => x.Contains(uniquePrefix));
                 const string counterName = "Version Buckets Allocated";
                 if (ravenInstance == null || !category.CounterExists(counterName))
                 {
@@ -570,11 +586,6 @@ namespace Raven.Storage.Esent
                 {
                 }
             }
-        }
-
-        public IDisposable WriteLock()
-        {
-            return null; // Esent doesn't need this
         }
 
 		public IDisposable DisableBatchNesting()

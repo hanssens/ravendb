@@ -1,4 +1,6 @@
-﻿using System.Threading;
+﻿using System;
+using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Raven.Client.Connection.Async;
 using Raven.Json.Linq;
@@ -10,6 +12,7 @@ namespace Raven.Client.Connection
 		private readonly AsyncServerClient asyncServerClient;
 		private readonly long id;
 		private readonly RavenJToken state;
+		private readonly bool done;
 
 #if !SILVERLIGHT && !NETFX_CORE
 		private readonly ServerClient client;
@@ -25,6 +28,7 @@ namespace Raven.Client.Connection
 		{
 			this.id = id;
 			this.state = state;
+			this.done = true;
 		}
 
 		public Operation(AsyncServerClient asyncServerClient, long id)
@@ -36,21 +40,23 @@ namespace Raven.Client.Connection
 
 		public async Task<RavenJToken> WaitForCompletionAsync()
 		{
-			if (asyncServerClient == null)
+			if (done)
 				return state;
+			if (asyncServerClient == null)
+				throw new InvalidOperationException("Cannot use WaitForCompletionAsync() when the operation was executed syncronously");
 
 			while (true)
 			{
-				var status = await asyncServerClient.GetOperationStatusAsync(id);
+                var status = await asyncServerClient.GetOperationStatusAsync(id).ConfigureAwait(false);
 				if (status == null)
 					return null;
 				if (status.Value<bool>("Completed"))
 					return status.Value<RavenJToken>("State");
 
 #if NET45
-				await Task.Delay(500);
+				await Task.Delay(500).ConfigureAwait(false);
 #else
-				await TaskEx.Delay(500);
+                await TaskEx.Delay(500).ConfigureAwait(false);
 #endif
 
 			}
@@ -59,8 +65,10 @@ namespace Raven.Client.Connection
 #if !SILVERLIGHT && !NETFX_CORE
 		public RavenJToken WaitForCompletion()
 		{
-			if (client == null)
+			if (done)
 				return state;
+			if (client == null)
+				throw new InvalidOperationException("Cannot use WaitForCompletion() when the operation was executed asyncronously");
 
 			while (true)
 			{

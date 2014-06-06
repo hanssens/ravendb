@@ -4,19 +4,16 @@
 // </copyright>
 //-----------------------------------------------------------------------
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-
 using Lucene.Net.Analysis;
 using Lucene.Net.Analysis.Tokenattributes;
 using Lucene.Net.Index;
 using Lucene.Net.QueryParsers;
 using Lucene.Net.Search;
 using Raven.Abstractions.Indexing;
-using SpellChecker.Net.Search.Spell;
 using Version = Lucene.Net.Util.Version;
 
 namespace Raven.Database.Indexing
@@ -71,17 +68,46 @@ namespace Raven.Database.Indexing
 
 			var fieldQuery = GetFieldQuery(field, termStr);
 
+			string analyzedTerm;
 			var tq = fieldQuery as TermQuery;
-			var analyzedTerm = tq != null ? tq.Term.Text : termStr;
+			var pq = fieldQuery as PhraseQuery;
+			if (tq != null)
+			{
+				analyzedTerm = tq.Term.Text;
 
-			if (termStr.StartsWith("*") && analyzedTerm.StartsWith("*") == false)
-				analyzedTerm = "*" + analyzedTerm;
+				if (termStr.StartsWith("*") && analyzedTerm.StartsWith("*") == false)
+					analyzedTerm = "*" + analyzedTerm;
 
-			if (termStr.EndsWith("*") && analyzedTerm.EndsWith("*") == false)
-				analyzedTerm += "*";
+				if (termStr.EndsWith("*") && analyzedTerm.EndsWith("*") == false)
+					analyzedTerm += "*";
+			}
+			else if(pq != null)
+			{
+				// search ?,* in source not in target, add them per position. e.g: 
+				// *foo* -> foo == *foo*
+				// Bro?n -> bro n == "bro?n"
+
+				var builder = new StringBuilder();
+				foreach (var term in pq.GetTerms())
+				{
+					if (builder.Length < termStr.Length)
+					{
+						var c = termStr[builder.Length];
+						if (c == '?' || c == '*')
+						{
+							builder.Append(c);
+						}
+					}
+					builder.Append(term.Text);
+				}
+				analyzedTerm = builder.ToString();
+			}
+			else
+			{
+				analyzedTerm = termStr;
+			}
 
 			return NewWildcardQuery(new Term(field, analyzedTerm));
-
 		}
 
 		protected override Query GetFuzzyQuery(string field, string termStr, float minSimilarity)
@@ -137,10 +163,18 @@ namespace Raven.Database.Indexing
 		/// <returns></returns>
 		protected override Query GetRangeQuery(string field, string lower, string upper, bool inclusive)
 		{
+			bool minInclusive = inclusive;
+			bool maxInclusive = inclusive;
 			if (lower == "NULL" || lower == "*")
+			{
 				lower = null;
+				minInclusive = true;
+			}
 			if (upper == "NULL" || upper == "*")
+			{
 				upper = null;
+				maxInclusive = true;
+			}
 
 			if ( (lower == null || !NumericRangeValue.IsMatch(lower)) && (upper == null || !NumericRangeValue.IsMatch(upper)))
 			{
@@ -163,19 +197,19 @@ namespace Raven.Database.Indexing
 			{
 				case TypeCode.Int32:
 				{
-					return NumericRangeQuery.NewIntRange(field, (int)(from ?? Int32.MinValue), (int)(to ?? Int32.MaxValue), inclusive, inclusive);
+					return NumericRangeQuery.NewIntRange(field, (int)(from ?? Int32.MinValue), (int)(to ?? Int32.MaxValue), minInclusive, maxInclusive);
 				}
 				case TypeCode.Int64:
 				{
-					return NumericRangeQuery.NewLongRange(field, (long)(from ?? Int64.MinValue), (long)(to ?? Int64.MaxValue), inclusive, inclusive);
+					return NumericRangeQuery.NewLongRange(field, (long)(from ?? Int64.MinValue), (long)(to ?? Int64.MaxValue), minInclusive, maxInclusive);
 				}
 				case TypeCode.Double:
 				{
-					return NumericRangeQuery.NewDoubleRange(field, (double)(from ?? Double.MinValue), (double)(to ?? Double.MaxValue), inclusive, inclusive);
+					return NumericRangeQuery.NewDoubleRange(field, (double)(from ?? Double.MinValue), (double)(to ?? Double.MaxValue), minInclusive, maxInclusive);
 				}
 				case TypeCode.Single:
 				{
-					return NumericRangeQuery.NewFloatRange(field, (float)(from ?? Single.MinValue), (float)(to ?? Single.MaxValue), inclusive, inclusive);
+					return NumericRangeQuery.NewFloatRange(field, (float)(from ?? Single.MinValue), (float)(to ?? Single.MaxValue), minInclusive, maxInclusive);
 				}
 				default:
 				{

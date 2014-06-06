@@ -114,7 +114,7 @@ namespace Raven.Storage.Managed
 		{
 			return storage.Documents["ByKey"].SkipTo(new RavenJObject { { "key", idPrefix } })
 				.Skip(start)
-				.TakeWhile(x => x.Value<string>("key").StartsWith(idPrefix))
+				.TakeWhile(x => x.Value<string>("key").StartsWith(idPrefix,StringComparison.OrdinalIgnoreCase))
 				.Select(result => DocumentByKey(result.Value<string>("key"), null))
 				.Take(take);
 		}
@@ -413,8 +413,8 @@ namespace Raven.Storage.Managed
 						throw new ConcurrencyException(op + " attempted on document '" + key +
 													   "' using a non current etag")
 						{
-							ActualETag = etag,
-							ExpectedETag = existingEtag
+							ActualETag = existingEtag,
+							ExpectedETag = etag
 						};
 					}
 				}

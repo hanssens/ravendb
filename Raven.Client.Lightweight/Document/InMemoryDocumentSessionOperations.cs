@@ -464,6 +464,11 @@ more responsive application.
                 if (entityType == typeof (RavenJObject))
                     return documentFound.CloneToken();
 
+				foreach (var extendedDocumentConversionListener in listeners.ExtendedConversionListeners)
+				{
+					extendedDocumentConversionListener.BeforeConversionToEntity(id, documentFound, metadata);
+				}
+
 				var defaultValue = GetDefaultValue(entityType);
 				var entity = defaultValue;
 				EnsureNotReadVetoed(metadata);
@@ -490,6 +495,11 @@ more responsive application.
 				foreach (var documentConversionListener in listeners.ConversionListeners)
 				{
 					documentConversionListener.DocumentToEntity(id, entity, documentFound, metadata);
+				}
+				
+				foreach (var extendedDocumentConversionListener in listeners.ExtendedConversionListeners)
+				{
+					extendedDocumentConversionListener.AfterConversionToEntity(id, documentFound, metadata, entity);
 				}
 
 				return entity;
@@ -607,7 +617,7 @@ more responsive application.
 			}
 		}
 
-		private static void EnsureNotReadVetoed(RavenJObject metadata)
+		internal void EnsureNotReadVetoed(RavenJObject metadata)
 		{
 			var readVeto = metadata["Raven-Read-Veto"] as RavenJObject;
 			if (readVeto == null)
@@ -1098,6 +1108,17 @@ more responsive application.
 		public virtual void Defer(params ICommandData[] commands)
 		{
 			deferedCommands.AddRange(commands);
+		}
+
+		/// <summary>
+		/// Version this entity when it is saved.  Use when Versioning bundle configured to ExcludeUnlessExplicit.
+		/// </summary>
+		/// <param name="entity">The entity.</param>
+		public void ExplicitlyVersion(object entity)
+		{
+			var metadata = GetMetadataFor(entity);
+
+			metadata[Constants.RavenCreateVersion] = true;
 		}
 
 		/// <summary>
