@@ -1,0 +1,36 @@
+﻿import requestExecution = require("common/notifications/requestExecution");
+
+class protractedCommandsDetector {
+    static instance = new protractedCommandsDetector();
+
+    private requestsInProgress = [] as Array<requestExecution>;
+
+    showSpinner = ko.observable<boolean>(false);
+    showServerNotResponding = ko.observable<boolean>(false);
+
+    constructor() {
+        this.showSpinner.subscribe((show: boolean) => $("body").toggleClass("processing", show));
+    }
+
+    requestStarted(timeForSpinner: number, timeForAlert: number = 0): requestExecution {
+        const execution = new requestExecution(timeForSpinner, timeForAlert, () => this.sync());
+
+        this.requestsInProgress.push(execution);
+
+        return execution;
+    }
+
+    private sync() {
+        this.showSpinner(_.some(this.requestsInProgress, x => x.spinnerVisible));
+
+        _.remove(this.requestsInProgress, x => x.completed);
+    }
+
+    private showServerNotRespondingAlert() {
+        this.showServerNotResponding(true);
+        $.blockUI({ message: '<div id="longTimeoutMessage"><span> This is taking longer than usual</span><br/><span>(Waiting for server to respond)</span></div>' });
+    }
+
+}
+
+export = protractedCommandsDetector;

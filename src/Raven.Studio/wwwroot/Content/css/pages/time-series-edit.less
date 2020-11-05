@@ -1,0 +1,39 @@
+.edit-time-series {
+    .document-header {
+        margin-bottom: 8px;
+        
+        .dropdown-toggle {
+            min-width: 120px;
+        }
+    }
+    
+    .documentId {
+        font-size: 25px;
+    }
+    
+    .utc-info-container {
+        &:before {
+            content: 'All dates are in UTC';
+            top: 0;
+            right: 0;
+            position: absolute;
+            background-color: @panel-info-bg;
+            font-size: 12px;
+            color: @panel-info-text;
+            padding: 2px 5px;
+            transform: translateY(-100%);
+        }
+    }
+}
+
+.edit-time-series-entry {
+
+    .name-value {
+        color: @text-emphasis;
+    }
+    
+    .aggregation-name {
+        width: 200px;
+        text-align: right;
+    }
+}

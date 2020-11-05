@@ -1,0 +1,76 @@
+<div class="modal-dialog" id="destinationModal" role="document">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><i class="icon-cancel"></i></button>
+            <h4 class="modal-title" id="myModalLabel">Choose a Task:</h4>
+        </div>
+        <div class="modal-body">
+            <div class="padding padding-sm text-center">
+                <div class="hr-title">
+                    <h5>Replication</h5>
+                    <hr />
+                </div>
+                <div class="row row-sm flex-row">
+                    <div class="col-sm-4 margin-bottom" title="Create new external replication task">
+                        <a href="#" class="external-replication" data-bind="click: newReplicationTask">
+                            <i class="icon-external-replication"></i><br />External Replication
+                        </a>
+                    </div>
+
+                    <div class="col-sm-4 margin-bottom" title="Create new pull replication hub">
+                        <a href="#" class="pull-replication-hub" data-bind="click: newPullReplicationHubTask">
+                            <i class="icon-pull-replication-hub"></i><br />Pull Replication Hub
+                        </a>
+                    </div>
+
+                    <div class="col-sm-4 margin-bottom" title="Create new pull replication sink">
+                        <a href="#" class="pull-replication-sink" data-bind="click: newPullReplicationSinkTask">
+                            <i class="icon-pull-replication-agent"></i><br />Pull Replication Sink
+                        </a>
+                    </div>
+                </div>
+                <div class="hr-title">
+                    <h5>ETL</h5>
+                    <hr />
+                </div>
+                
+                <div class="row row-sm flex-row">
+                    <div class="col-sm-4 margin-bottom" title="Create new RavenDB ETL task">
+                        <a href="#" class="ravendb-etl" data-bind="click: newRavenEtlTask">
+                            <i class="icon-ravendb-etl"></i><br />RavenDB ETL
+                        </a>
+                    </div>
+                    <div class="col-sm-4 margin-bottom" title="Create new SQL ETL task">
+                        <a href="#" class="sql-etl" data-bind="click: newSqlEtlTask">
+                            <i class="icon-sql-etl"></i><br />SQL ETL
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="hr-title">
+                    <h5>Backups & subscriptions</h5>
+                    <hr />
+                </div>
+                
+                <div class="row row-sm flex-row">
+                    <div class="col-sm-4 margin-bottom" title="Create new backup task">
+                        <a href="#" class="periodic-backup" data-bind="click: newBackupTask">
+                            <i class="icon-backup"></i><br />Backup
+                        </a>
+                    </div>
+                    <div class="col-sm-4 margin-bottom" title="Create new subscription task">
+                        <a href="#" class="subscription" data-bind="click: newSubscriptionTask">
+                            <i class="icon-subscription"></i><br />Subscription
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- TODO
+        <div class="modal-footer">
+            <div class="padding text-center">
+                <a href="#">Which one should I choose?</a>
+            </div>
+        </div> -->
+    </div>
+</div>

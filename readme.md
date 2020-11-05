@@ -1,46 +1,134 @@
-﻿# Raven DB
+# RavenDB - An ACID NoSQL Document Database
+This repository contains source code for the [RavenDB](https://ravendb.net/) document database. With a RavenDB database you can set up a NoSQL data architecture or add a NoSQL layer to your current relational database.
 
-## A 2nd generation document database
+![RavenDB Studio](docs/readmeScreenshot.png)
 
-Issue tracker: http://issues.hibernatingrhinos.com
+## Supported Platforms
+- Windows
+- Linux
+- Docker
+- MacOS
+- Raspberry Pi
 
-You can start the Raven Service by executing /server/raven.server.exe, and then you can then visit
-http://localhost:8080 for looking at the UI.
+## Grab Your License and Download Latest Version
 
-For any questions, please visit: http://groups.google.com/group/ravendb/
+Request [your license](https://ravendb.net/free).
 
-RavenDB's homepage: http://ravendb.net
+Download [the latest version of RavenDB](https://ravendb.net/downloads).
 
-For your convenience RavenDB is also available as nuget packages: RavenDB.Client and RavenDB.Embedded.
+## Getting Started
+Install and [set up your database](https://ravendb.net/docs/article-page/5.0/csharp/start/getting-started).
 
-## This release contains the following:
+## Learn RavenDB Quickly
+[RavenDB Bootcamp](https://ravendb.net/learn/bootcamp) is a free, self-directed learning course. In just three units you will learn how to use RavenDB to create fully-functional, real-world programs with NoSQL Databases. If you are unfamiliar with NoSQL, it’s okay. We will provide you with all the information you need.
 
-/Client		- RavenDB lightweight client for .NET 4.0 and its dependencies.
-		*** This is the recommended client to use ***
+## Stay Updated on New Developments
+We keep adding new features to improve your RavenDB experience. Check out [our latest improvements](https://ravendb.net/docs/article-page/5.0/csharp/start/whats-new), updated weekly.
 
-/Silverlight	- A lightweight Silverlight 4.0 client for RavenDB and its dependencies..
+## Documentation
+Access [full documentation](https://ravendb.net/docs/article-page/5.0/csharp) for RavenDB. Like our database, it is easy to use.
 
+## Where to Ask for Help
+If you have any questions, or need further assistance, you can [contact us directly](https://ravendb.net/contact).
 
-/EmbeddedClient	- The files required to run the RavenDB client, in server or embedded mode.
-		  Reference Raven.Client.Embedded.dll and create a DocumentStore, passing a URL
-		  or a directory. See the docs for more help.
+## Report an Issue
+Please check where to report an issue in our [contribution guidelines](./CONTRIBUTING.md#reporting-an-issue).
 
-Whichever client version you choose to use, reference all the assemblies in the corresponding folder to your project.
+## RavenDB Developer Community Group
+If you have any questions please visit our [community group](http://groups.google.com/group/ravendb/). The solutions for the most common challenges are available. You are welcome to join!
 
-As for the rest of the folders in the package, here's a brief description of what they contain:
+## Pull Requests
+Please check how to submit a Pull Request in our [contribution guidelines](./CONTRIBUTING.md#submitting-a-pull-request).
 
-/Server		- The files required to run RavenDB in server / service mode.
-		  Execute /Server/Raven.Server.exe /install to register and start the Raven service
-		  
-/Web		- The files required to run RavenDB under IIS.
-		  Create an IIS site in the /Web directory to start the Raven site.		
+## Setup & Run
 
-/Bundles	- Bundles for extending RavenDB in various ways
-	
-/Samples	- Some sample applications for RavenDB
-		* Under each sample application folder there is a "Start Raven.cmd" file which will
-		starts Raven with all the data and indexes required to run the sample successfully.
+First please [review and set up prerequisites](https://ravendb.net/docs/article-page/5.0/csharp/start/getting-started#prerequisites).
 
-/Backup - [Standalone backup tool](http://ravendb.net/docs/server/administration/backup-restore), for performing backup operations using a user with admin privileges.
+### Launch RavenDB:
+Running locally:
+```
+<path/to/ravendb>/Server/Raven.Server
+```
 
-/Smuggler - [The Import/Export utility](http://ravendb.net/docs/server/administration/export-import) for RavenDB.
+Registering as service in Windows using `rvn` utility available in the package *Server* directory:
+```
+<path\to\ravendb>\rvn.exe windows-service register --service-name RavenDB4
+```
+
+### Hello World (.NET)
+
+#### Server Side
+
+- Launch a RavenDB server instance as follows:
+```
+<path/to/ravendb>/Server/Raven.Server --ServerUrl=http://localhost:8080
+```
+
+- Open a web browser and enter `http://localhost:8080`
+
+- Click on `Databases` in the menu on the left-hand side, and then create a new database named `SampleDataDB`
+
+- Click on `Settings` and then on `Create Sample Data` in the left menu. Now Click on `Create`
+
+#### Client Side
+
+- Install .NET Core SDK. See : [Downloads](https://www.microsoft.com/net/download) and [PowerShell](https://github.com/PowerShell/PowerShell/releases)
+
+- Open a terminal and type:
+
+```bash
+mkdir HelloWorld
+cd HelloWorld
+dotnet new console
+```
+
+- Add the RavenDB Client package:
+
+```powershell
+   dotnet add package RavenDB.Client --version 5.0.0-*
+```
+
+- Replace the content of Program.cs with the following:
+```csharp
+using System;
+using Raven.Client.Documents;
+
+namespace HelloWorld
+{
+    class Shippers
+    {
+        public string Name;
+        public string Phone;
+    }
+    
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            using (var store = new DocumentStore
+            {
+                Urls = new string[] {"http://localhost:8080"},
+                Database = "SampleDataDB"
+            })
+            {
+                store.Initialize();
+
+                using (var session = store.OpenSession())
+                {
+                    var shipper = session.Load<Shippers>("shippers/1-A");
+                    Console.WriteLine("Shipper #1 : " + shipper.Name + ", Phone: " + shipper.Phone);
+                }
+            }
+        }
+    }
+}
+```
+
+- Type:
+```bash
+dotnet restore
+dotnet build
+dotnet run
+```
+
+###### Enjoy :)

@@ -1,0 +1,104 @@
+<h2 class="margin-bottom margin-top"><strong class="margin-right">2.</strong>Unsecured Mode Setup</h2>
+<form class="flex-form" data-bind="with: model.unsecureSetup, submit: save">
+    <div class="panel padding padding-lg">
+        <div class="margin-bottom">
+            <div class="form-group" data-bind="validationElement: port">
+                <label for="port" class="control-label">HTTP Port</label>
+                <div class="flex-grow">
+                    <input type="text" autocomplete="off" class="form-control" id="port"
+                           placeholder="Default: 8080. Used by clients and studio."
+                           data-bind="textInput: port, disable: $root.model.fixPortNumberOnLocalNode, attr: { title: $root.model.fixPortNumberOnLocalNode() ? 'Fixed by startup parameter': '' }">
+                </div>
+            </div>
+            <div class="form-group" data-bind="validationElement: tcpPort">
+                <label for="tcpPort" class="control-label">TCP Port</label>
+                <div class="flex-grow">
+                    <input type="text" autocomplete="off" class="form-control" id="tcpPort"
+                           placeholder="Default: 38888. Used for inter-servers communication and subscriptions."
+                           data-bind="textInput: tcpPort, disable: $root.model.fixTcpPortNumberOnLocalNode, attr: { title: $root.model.fixTcpPortNumberOnLocalNode() ? 'Fixed by startup parameter': '' }">
+                </div>
+            </div>
+            
+            <div data-bind="with: ip">
+                <div class="form-group" data-bind="validationElement: ip">
+                    <label class="control-label" data-bind="attr: { for: 'ipInput' }">
+                        <span>IP address<i class="required"></i></span>
+                    </label>
+                    <div class="flex-grow input-group dropdown ip-dropdown" data-bind="validationOptions: { insertMessages: false }"> 
+                        <input type="text" autocomplete="off" class="form-control"
+                               placeholder="Enter server IP address that the server will listen to"
+                               title="An IP address that the server will listen to"
+                               data-bind="textInput: ip, attr: { id: 'inInput' }">
+                        <span class="caret dropdown-toggle" data-toggle="dropdown"></span>
+                        <ul class="dropdown-menu" role="menu" style="display: none;"
+                            data-bind="autoComplete: '#inInput', foreach: $root.model.createIpAutocompleter(null, ip)">
+                            <li role="presentation" data-bind="click: $parent.ip.bind($parent, $data)" title="The server will listen to this IP">
+                                <a role="menuitem" tabindex="-1" href="#">
+                                    <span data-bind="text: $data"></span>
+                                </a>
+                            </li>
+                        </ul>
+                        <div data-bind="validationOptions: { errorsAsTitle: false }, validationElement: ip">
+                            <div class="help-block" data-bind="validationMessage: ip"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" data-bind="validationElement: bootstrapCluster">
+                <label for="bootstrapCluster" class="control-label">&nbsp;</label>
+                <div class="flex-grow">
+                    <div class="toggle">
+                        <input id="bootstrapCluster" class="styled" type="checkbox" data-bind="checked: bootstrapCluster">
+                        <label for="bootstrapCluster">
+                            Create new cluster
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" data-bind="validationElement: localNodeTag, visible: bootstrapCluster">
+                <label for="localNodeTag" class="control-label">Node Tag</label>
+                <div class="flex-grow">
+                    <input type="text" autocomplete="off" class="form-control" id="localNodeTag" data-bind="textInput: localNodeTag">
+                </div>
+            </div>
+        </div>
+        <div class="padding bg-warning" data-bind="visible: shouldDisplayUnsafeModeWarning">
+            <div class="checkbox flex-horizontal" data-bind="validationOptions: { insertMessages: false }">
+                <input id="unsafeNetworkWarning" type="checkbox" data-bind="checked: unsafeNetworkConfirm">
+                <label for="unsafeNetworkWarning">
+                    <i class="icon-warning"></i>
+                    I understand the risk behind running RavenDB server in an unsecured mode.<br>
+                    Authentication is off, anyone who can access the server using the configured IP address will be granted <strong>administrative privileges</strong>
+                </label>
+            </div>
+            <div data-bind="validationElement: unsafeNetworkConfirm">
+                <div class="help-block" data-bind="validationMessage: unsafeNetworkConfirm"></div>
+            </div>
+        </div>
+        
+        <div class="form-group" data-bind="validationElement: $root.model.environment, with: $root.model, visible: bootstrapCluster">
+            <label for="port" class="control-label">Environment</label>
+            <div style="position: relative">
+                <button class="btn btn-block dropdown-toggle" type="button" data-toggle="dropdown">
+                    <span data-bind="text: environment"></span>
+                    <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" data-bind="foreach: $root.constructor.environments">
+                    <li><a href="#" data-bind="text: $data, click: $parent.environment.bind($parent.environment, $data)"></a></li>
+                </ul>
+                <span class="help-block" data-bind="validationMessage: environment"></span>
+            </div>
+        </div>
+    </div>
+    <div class="navigation padding padding-lg flex-horizontal">
+        <button type="button" class="btn btn-default btn-lg" data-bind="click: $root.back">
+            <i class="icon-arrow-left"></i><span>Back</span>
+        </button>
+        <div class="flex-separator"></div>
+        <button type="submit" class="btn btn-primary btn-lg">
+            <span>Next</span> <i class="icon-arrow-right"></i>
+        </button>
+    </div>
+</form>

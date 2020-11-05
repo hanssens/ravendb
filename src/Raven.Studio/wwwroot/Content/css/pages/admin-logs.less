@@ -1,0 +1,69 @@
+﻿.log-list {
+    .item {
+        &:not(.bg-danger) {
+            background-color: @panel-bg;
+        }
+        
+        border: none;
+        white-space: pre-wrap;
+        font-size: 13px;
+        line-height: 17px;
+        width: 100%;
+        
+        .copy-item-button {
+            color: darken(@color-4-1, 20%);
+            visibility: hidden;
+            padding: 5px 0px 0px 5px;
+        }
+
+        &:hover {
+            .copy-item-button {
+                visibility: visible;
+            }
+        }
+    }
+
+    pre {
+        padding: 0px 2px 0px 2px;
+    }
+    
+    span {
+        padding: 5px 5px 5px 1px;
+    }
+    
+    .even {
+        .item {
+            &:not(.bg-danger) {
+                background-color: lighten(@panel-bg,5%);
+            }
+            
+            span {
+                &.bg-danger {
+                    background-color: lighten(@state-danger-bg, 6%);
+                }
+            }
+        }
+    }
+}
+
+.admin-logs {
+    .columns-list-container {
+        width: 600px;
+        
+        &#settingsContainer {
+            height: auto;
+        }
+    }
+
+    .full-width {
+       width: 100%;
+    }
+
+    #adminLogsPath {
+        word-break: break-word;
+    }
+
+    #selectedLogMode {
+        margin-top: 5px;
+    }
+}

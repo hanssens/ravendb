@@ -1,0 +1,338 @@
+.databases {
+
+    .link-disabled {
+        pointer-events: none;
+        cursor: default;
+    }
+
+    .databasesToolbar-toggleCompactView {
+        display: inline-block;
+        margin-left: 10px;
+    }
+
+    .databasesToolbar-actions {
+        display: inline-block;
+        margin-left: @grid-gutter-width / 2;
+    }
+
+    .databasesToolbar-typeSelector {
+        .btn {
+            .badge {
+                margin-left: 5px;
+            }
+        }
+    }
+
+    .align-checkboxes {
+        margin-left: 38px;
+        margin-right: 0;
+        position: relative;
+        top: -2px;
+    }
+
+    .vertical-divider {
+        position: relative;
+
+        @media (min-width:@screen-sm) and (max-width:@screen-lg-max) {
+            margin-left: 27px;
+        }
+
+        @media (min-width:@screen-xl) {
+            &:before {
+                content: '';
+                display: block;
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                border-left: 1px solid @gray-dark;
+            }
+        }
+    }
+
+    .database-item {
+        padding-left: 30px;
+        position: relative;
+
+        .state-remote {
+            background-color: #43495e;
+        }
+
+        .info-grow {
+            .info-resize {
+                display: none;
+            }
+        }
+        
+        @media (min-width: @screen-lg) {
+            .info-grow {
+                width: 350px;
+                position: relative;
+                
+                .info-resize {
+                    display: block;
+                    position: absolute;
+                    right: -3px;
+                    width: 6px;
+                    cursor: ew-resize;
+                    height: 100%;
+                    z-index: @zindex-tooltip;
+                }
+            }
+        }
+
+        @media (min-width:@screen-sm) and (max-width:@screen-lg-max) {
+            .info-grow {
+                order: 1;
+                flex-grow: 1;
+            }
+
+            .properties-container {
+                order: 3;
+                width: 100%;
+            }
+
+            .actions-container {
+                order: 2;
+            }
+        }
+
+        &:not(.relevant) {
+            background-color: darken(@gray-darker, 4%);
+
+            &:hover {
+                background-color: darken(@gray-darker, 2%);
+            }
+
+            border: 1px dashed @gray-dark;
+
+            &:not(:hover) {
+                .dbgroup-node-type, .properties-item {
+                    opacity: .6;
+                }
+            }
+        }
+
+        .database-encryption-status {
+            text-align: center;
+            width: 21px;
+            margin-right: @grid-gutter-width/4;
+            align-self: flex-start;
+        }
+
+        .dbgroup-node-type {
+            display: flex;
+            flex-wrap: wrap;
+
+            a {
+                color: @text-color;
+
+                &:hover {
+                    color: @text-emphasis;
+                }
+            }
+        }
+
+        .dbgroup-node-type > div {
+            padding-right: 10px;
+        }
+
+        .database-info {
+            display: flex;
+            flex-wrap: wrap;
+
+            @media (max-width: @screen-xs-max) {
+                flex-direction: column;
+            }
+        }
+
+        .database-name {
+            font-size: 118%;
+            margin-bottom: 0;
+            font-weight: normal;
+            white-space: nowrap;
+            overflow: hidden;
+            flex-grow: 1;
+        }
+
+        .info-container {
+            font-size: 19px;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+
+            .checkbox {
+                top: -3px;
+                flex-shrink: 0;
+            }
+
+            .database-name {
+                top: -3px;
+                position: relative;
+                display: flex;
+
+                a, span {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                i {
+                    flex-shrink: 0;
+                }
+            }
+
+            h3 {
+                margin-top: 0px;
+            }
+
+            .label {
+                font-size: 11px;
+                margin-right: @grid-gutter-width/2;
+                flex-shrink: 0;
+            }
+        }
+
+        .actions-container {
+            flex-shrink: 0;
+        }
+
+        .checkbox {
+            position: relative;
+            margin: 0;
+        }
+
+        .state {
+        }
+
+        .state.state-warning {
+            cursor: auto;
+        }
+    }
+
+    .properties-container {
+        flex-grow: 1;
+        align-self: center;
+        min-height: 52px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        justify-items: stretch;
+        grid-auto-flow: dense;
+
+        @media (min-width: @screen-lg) {
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            grid-auto-flow: column;
+        }
+
+
+        .properties-item {
+            &.item-last-backup {
+                grid-column-start: 2;
+            }
+
+            .set-size {
+                padding: 0px 10px;
+            }
+
+            height: 22px;
+        }
+
+        a {
+            color: @text-color;
+
+            &:hover {
+                color: @text-emphasis;
+                transition: color .15s ease;
+            }
+        }
+    }
+}
+
+#encryption_qrcode {
+    .padding;
+    position: relative;
+    display: inline-block;
+
+    &::before {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        -moz-transform: translateX(-50%) translateY(-50%);
+        -webkit-transform: translateX(-50%) translateY(-50%);
+        -o-transform: translateX(-50%) translateY(-50%);
+        -ms-transform: translateX(-50%) translateY(-50%);
+        transform: translateX(-50%) translateY(-50%);
+        content: '';
+        width: 90px;
+        height: 90px;
+        background-image: url(../img/qr_logo.png);
+        background-size: contain;
+    }
+
+    img, canvas {
+        padding: 30px;
+        background-color: white;
+    }
+}
+
+#newDatabase {
+    .restore-point-row {
+        display: flex;
+
+        .date {
+            flex-grow: 1;
+            font-weight: bold;
+        }
+
+        .type, .node, .files {
+            flex-basis: 95px;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .encryption {
+            flex-basis: 80px;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .dropdown-header {
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+    }
+
+    .dropdown {
+        .dropdown-menu {
+            &.has-info {
+                .bg-info {
+                    padding: 3px 20px;
+                    text-align: unset;
+                }
+            }
+        }
+    }
+}
+
+.more-nodes-tooltip {
+    max-width: 340px;
+    
+    a {
+        color: @gray-light;
+
+        &:hover {
+            color: lighten(@gray-light, 25%);
+            transition: color .15s ease;
+        }
+    }
+}
+
+#restorePointSpinner {
+    margin-left: 10px;
+}
+
+#compactDatabaseDialog {
+    .limit-height {
+        max-height: 500px;
+    }
+}

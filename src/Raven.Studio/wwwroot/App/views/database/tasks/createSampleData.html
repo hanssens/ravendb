@@ -1,0 +1,44 @@
+<div class="sampleData content-margin">
+
+    <div class="sample-data-main">
+        <div class="center">
+            <h1>Sample Data</h1>
+            <div class="button-wrapper">
+                <button class="btn btn-primary btn-lg btn-spinner sampleData-createBtn" data-bind="click: generateSampleData, css: { 'btn-spinner': isBusy() }, disable: !canCreateSampleData() || isBusy()">
+                    <span>
+                        Create<span data-bind="visible: justCreatedSampleData()">d</span>
+                    </span>
+                </button>
+                <div class="padding padding-xs bg-danger" data-bind="visible: !canCreateSampleData() && !justCreatedSampleData()">
+                    <small>
+                        Requires an empty database
+                    </small>
+                </div>
+                <div class="padding padding-xs bg-danger" data-bind="visible: justCreatedSampleData()">
+                    <a href="#" data-bind="attr: { href: urlForDatabaseDocuments() }"><small>Go to documents</small></a>
+                </div>
+            </div>
+            <br />
+            <a href="#" data-bind="click: showCode" class="csharplink">View <strong class="text-success">C#</strong> classes</a>
+        </div>
+    </div>
+
+    <div class="panel panel-default" data-bind="visible: classesVisible">
+        <div class="panel-body">
+
+            <div class="clearfix">
+                <h3 class="pull-left">Sample data C# code</h3>
+                <div class="btn-group btn-group-sm pull-right" role="group">
+                    <button class="btn btn-default" data-bind="click: copyClasses">
+                        <i class="icon-copy"></i>
+                        <span>
+                            Copy C# classes for sample data
+                        </span>
+                    </button>
+                </div>
+            </div>
+            <pre class="sampleData-classes" data-bind="html: classDataFormatted"></pre>
+
+        </div>
+    </div>
+</div>

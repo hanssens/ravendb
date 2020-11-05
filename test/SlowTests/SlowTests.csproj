@@ -1,0 +1,239 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RuntimeFrameworkVersion>3.1.9</RuntimeFrameworkVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>SlowTests</AssemblyName>
+    <PackageId>SlowTests</PackageId>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <CodeAnalysisRuleSet>..\..\RavenDB.ruleset</CodeAnalysisRuleSet>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <Compile Include="..\..\src\CommonAssemblyInfo.Windows.cs" Link="Properties\CommonAssemblyInfo.Windows.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <Compile Include="..\..\src\CommonAssemblyInfo.Linux.cs" Link="Properties\CommonAssemblyInfo.Linux.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Data\legacy-counters.4.1.5.ravendbdump" />
+    <None Remove="Data\RavenDB_11488\ravendb-11488-artificial-docs-not-included.ravendbdump" />
+    <None Remove="Data\RavenDB-12785.ravendbdump" />
+    <None Remove="Data\RavenDB_11488\ravendb-11488.ravendb-snapshot" />
+    <None Remove="Data\RavenDB_13291\collection-with-counter-word-4.1.5-nightly.ravendb-snapshot" />
+    <None Remove="Data\RavenDB_13468\counters-snapshot-document.json" />
+    <None Remove="Data\RavenDB_13468\counters.test.4.1.6.ravendb-snapshot" />
+    <None Remove="Data\RavenDB_13512\counters.test.4.1.6.ravendb-full-backup" />
+    <None Remove="Data\RavenDB_13512\Incremental\17.ravendb-full-backup" />
+    <None Remove="Data\RavenDB_13512\Incremental\18-01.ravendb-incremental-backup" />
+    <None Remove="Data\RavenDB_13512\Incremental\18.ravendb-incremental-backup" />
+    <None Remove="Data\RavenDB-13937.ravendbdump" />
+    <None Remove="Data\RavenDB_13759\Auto_Orders_ByOrderedAt.zip" />
+    <None Remove="Data\RavenDB_13759\Orders_ByOrderBy.zip" />
+    <None Remove="Data\RavenDB_13940\storage-with-reused-journal-and-synced-data-2.zip" />
+    <None Remove="Data\RavenDB_13940\storage-with-reused-journal-and-synced-data.zip" />
+    <None Remove="Data\RavenDB_15223\counters.4.2.103.ravendb-snapshot" />
+    <None Remove="Data\RavenDB_15223\manycounters.4.2.103.ravendb-snapshot" />
+    <None Remove="Data\RavenDB_15700\BewerberStatus.csv" />
+    <None Remove="Data\RavenDB_15700\Bewerbung.csv" />
+    <None Remove="Data\RavenDB_15700\Vakanz.csv" />
+    <None Remove="Smuggler\Data\DocumentWithRevisions.ravendbdump" />
+    <None Remove="Smuggler\Data\RevisionsWithoutADocument.ravendbdump" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Tests.Infrastructure\CommonTestsAssemblyInfo.cs" Link="Properties\CommonTestsAssemblyInfo.cs" />
+    <Compile Include="..\..\src\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\xunit.runner.json" Link="xunit.runner.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <EmbeddedResource Include="Data\legacy-counters.4.1.5.ravendbdump" />
+    <EmbeddedResource Include="Data\npgsql.basic.create.sql" />
+    <EmbeddedResource Include="Data\npgsql.basic.insert.sql" />
+    <EmbeddedResource Include="Data\npgsql.northwind.create.sql" />
+    <EmbeddedResource Include="Data\npgsql.northwind.insert.sql" />
+    <EmbeddedResource Include="Data\oraclesql.basic.create.sql" />
+    <EmbeddedResource Include="Data\oraclesql.basic.insert.sql" />
+    <EmbeddedResource Include="Data\oraclesql.northwind.create.sql" />
+    <EmbeddedResource Include="Data\oraclesql.northwind.insert.sql" />
+    <EmbeddedResource Include="Data\RavenDB_11488\ravendb-11488-artificial-docs-not-included.ravendbdump" />
+    <EmbeddedResource Include="Data\RavenDB-12785.ravendbdump" />
+    <EmbeddedResource Include="Data\RavenDB-13937.ravendbdump" />
+    <EmbeddedResource Include="Data\RavenDB_10958.txt" />
+    <EmbeddedResource Include="Data\RavenDB_10958.json" />
+    <EmbeddedResource Include="Data\mssql.northwind.create.sql" />
+    <EmbeddedResource Include="Data\mssql.northwind.insert.sql" />
+    <EmbeddedResource Include="Data\mysql.northwind.create.sql" />
+    <EmbeddedResource Include="Data\mysql.northwind.insert.sql" />
+    <EmbeddedResource Include="Data\mssql.basic.create.sql" />
+    <EmbeddedResource Include="Data\mssql.basic.insert.sql" />
+    <EmbeddedResource Include="Data\mysql.basic.create.sql" />
+    <EmbeddedResource Include="Data\mysql.basic.insert.sql" />
+    <EmbeddedResource Include="Data\RavenDB_15159\12119.smaps.gz" />
+    <EmbeddedResource Include="Data\RavenDB_15294\northwind-4.2.103.zip" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Data\non-leaf-page-seq-id-large-values-2.txt" />
+    <EmbeddedResource Include="Data\non-leaf-page-seq-id-large-values.txt" />
+    <EmbeddedResource Include="Data\places.txt" />
+    <EmbeddedResource Include="Data\RavenDB_10404\northwind.4.0.0.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_11488\ravendb-11488.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_11664\1.ravendbdump" />
+    <EmbeddedResource Include="Data\RavenDB_12022\counters.4.1.4.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_13291\collection-with-counter-word-4.1.5-nightly.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_13468\counters-snapshot-document.json" />
+    <EmbeddedResource Include="Data\RavenDB_13468\counters.test.4.1.6.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_13512\counters.test.4.1.6.ravendb-full-backup" />
+    <EmbeddedResource Include="Data\RavenDB_13512\Incremental\17.ravendb-full-backup" />
+    <EmbeddedResource Include="Data\RavenDB_13512\Incremental\18-01.ravendb-incremental-backup" />
+    <EmbeddedResource Include="Data\RavenDB_13512\Incremental\18.ravendb-incremental-backup" />
+    <EmbeddedResource Include="Data\RavenDB_13759\Auto_Orders_ByOrderedAt.zip" />
+    <EmbeddedResource Include="Data\RavenDB_13759\Orders_ByOrderBy.zip" />
+    <EmbeddedResource Include="Data\RavenDB_13940\storage-with-reused-journal-and-synced-data-2.zip" />
+    <EmbeddedResource Include="Data\RavenDB_13940\storage-with-reused-journal-and-synced-data.zip" />
+    <EmbeddedResource Include="Data\RavenDB_15223\manycounters.4.2.103.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_15223\counters.4.2.103.ravendb-snapshot" />
+    <EmbeddedResource Include="Data\RavenDB_15700\BewerberStatus.csv" />
+    <EmbeddedResource Include="Data\RavenDB_15700\Bewerbung.csv" />
+    <EmbeddedResource Include="Data\RavenDB_15700\Vakanz.csv" />
+    <EmbeddedResource Include="Data\RavenDB_8355\MySorter.cs" />
+    <EmbeddedResource Include="Data\RavenDB_8355\MySorterWithDiagnostics.cs" />
+    <EmbeddedResource Include="Data\RavenDB_9912\1.ravendbdump" />
+    <EmbeddedResource Include="Data\RavenDB_9912\2.ravendbdump" />
+    <EmbeddedResource Include="Data\testing.ravendbdump" />
+    <EmbeddedResource Include="Data\data.txt" />
+    <EmbeddedResource Include="Data\data2.txt" />
+    <EmbeddedResource Include="MailingList\Everett\DocumentWithBytes.txt" />
+    <EmbeddedResource Include="Smuggler\Data\DocumentWithRevisions.ravendbdump" />
+    <EmbeddedResource Include="Smuggler\Data\Document_Without_Attachment_Stream.ravendbdump" />
+    <EmbeddedResource Include="Smuggler\Data\Identities_3.5.35288.ravendbdump" />
+    <EmbeddedResource Include="Smuggler\Data\Indexes_And_Transformers_3.5.ravendbdump" />
+    <EmbeddedResource Include="Smuggler\Data\Northwind_3.5.35168.ravendbdump" />
+    <EmbeddedResource Include="Smuggler\Data\RevisionsWithoutADocument.ravendbdump" />
+    <EmbeddedResource Include="Smuggler\Data\Revisions_3.5.35220.ravendbdump" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Raven.Client\Raven.Client.csproj" />
+    <ProjectReference Include="..\..\src\Raven.TestDriver\Raven.TestDriver.csproj" />
+    <ProjectReference Include="..\..\src\Sparrow\Sparrow.csproj" />
+    <ProjectReference Include="..\..\src\Voron\Voron.csproj" />
+    <ProjectReference Include="..\..\tools\Raven.Migrator\Raven.Migrator.csproj" />
+    <ProjectReference Include="..\..\tools\Voron.Recovery\Voron.Recovery.csproj" />
+    <ProjectReference Include="..\EmbeddedTests\EmbeddedTests.csproj" />
+    <ProjectReference Include="..\FastTests\FastTests.csproj" />
+    <ProjectReference Include="..\Tests.Infrastructure\Tests.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.7.1" />
+    <PackageReference Include="System.DirectoryServices.Protocols" Version="4.7.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <DotNetCliToolReference Include="dotnet-xunit" Version="2.4.0-beta.1.build10000" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Core\AdminConsole" />
+    <Folder Include="SchemaUpgrade\Issues\VoronCurrentVersion\" />
+    <Folder Include="Server\Basic" />
+    <Folder Include="Server\Documents\Notifications" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_999\headers.one">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_999\headers.two">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_999\Journals\0000000000000000000.journal">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_999\Journals\0000000000000000001.journal">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_999\Raven.voron">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_9\headers.one">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_9\headers.two">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_9\Journals\0000000000000000000.journal">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_9\Journals\0000000000000000001.journal">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\DocumentsVersion\schema_9\Raven.voron">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\after_from12.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\after_from13.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\after_from14.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\Identities_CompareExchange_RavenData.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\Identities_CompareExchange_RavenData_from12.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\Identities_CompareExchange_RavenData_from13.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\RavenData_rc1_plus_additions.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\SystemVersion\RavenDB_13724.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\VoronCurrentVersion\schema_999\headers.one">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\VoronCurrentVersion\schema_999\headers.two">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\VoronCurrentVersion\schema_999\Journals\0000000000000000000.journal">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\VoronCurrentVersion\schema_999\Journals\0000000000000000001.journal">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="SchemaUpgrade\Issues\VoronCurrentVersion\schema_999\Raven.voron">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Smuggler\Data\FSEsent.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Smuggler\Data\FSVoron.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Smuggler\Data\SampleDataEsent.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Smuggler\Data\SampleDataEsentLogFileSize4.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Smuggler\Data\SampleDataVoron.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Smuggler\Data\Tools.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Voron\LeafsCompression\Data\RavenDB-12700-page-1278-compressed">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

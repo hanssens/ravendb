@@ -1,0 +1,178 @@
+<form class="content-margin edit-backup" data-bind="with: configuration" autocomplete="off">
+    <div class="toolbar" data-bind="with: $root">
+        <button data-bind="click: saveBackupSettings, enable: $root.dirtyFlag().isDirty" type="submit" class="btn btn-primary">
+            <i class="icon-save"></i> <span>Save</span>
+        </button>
+        <button data-bind="click: cancelOperation" class="btn btn-default">
+            <i class="icon-cancel"></i><span>Cancel</span>
+        </button>
+    </div>
+    <div class="panel">
+        <div class="padding">
+            <strong><h3 data-bind="text: $parent.isAddingNewBackupTask() ? `New Server-Wide Backup Task` : `Edit Server-Wide Backup Task`"></h3></strong>
+            <div class="row margin-bottom" data-bind="validationElement: name">
+                <label class="control-label col-sm-4 col-lg-2">Task Name</label>
+                <div class="col-sm-4">
+                    <input data-bind="textInput: name" id="taskName" type="text" class="form-control" placeholder="Enter a name for the Server-Wide Backup Task"/>
+                </div>
+            </div>
+            <div class="row margin-bottom" data-bind="validationElement: backupType">
+                <label class="control-label col-sm-4 col-lg-2">Backup Type <i class="required"></i> <small><i id="backup-info" class="icon-info text-info"></i></small></label>
+                <div class="col-sm-4" data-bind="validationOptions: { insertMessages: false }">
+                    <div class="dropdown btn-block">
+                        <button class="btn btn-block dropdown-toggle text-left" type="button" data-toggle="dropdown">
+                            <span data-bind="text: backupType() || 'Select backup type..'"></span>
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu max-height" data-bind="foreach: backupOptions">
+                            <li><a href="#" data-bind="text: $data, click: $parent.useBackupType.bind($parent, $data)"></a></li>
+                        </ul>
+                    </div>
+                    <span class="help-block" data-bind="validationMessage: backupType"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <h3>Schedule</h3>
+    <div class="panel">
+        <div class="padding">
+            <div class="row margin-bottom" data-bind="validationElement: fullBackupFrequency">
+                <label class="control-label col-xs-12 col-sm-4 col-lg-2">Full</label>
+                <div class="col-xs-6 col-sm-4">
+                    <div class="toggle" data-bind="validationOptions: { insertMessages: false }">
+                        <input id="fullBackupToggle" type="checkbox" data-bind="checked: fullBackupEnabled">
+                        <label for="fullBackupToggle">Enable full backup</label>
+                    </div>
+                    <div data-bind="compose: $root.fullBackupCronEditor, visible: fullBackupEnabled"></div>
+                </div>
+            </div>
+            <div class="row margin-bottom" data-bind="validationElement: incrementalBackupFrequency">
+                <label class="control-label col-xs-12 col-sm-4 col-lg-2">Incremental</label>
+                <div class="col-xs-6 col-sm-4">
+                    <div class="toggle" data-bind="validationOptions: { insertMessages: false }">
+                        <input id="incrementalBackupToggle" type="checkbox" data-bind="checked: incrementalBackupEnabled">
+                        <label for="incrementalBackupToggle">Enable incremental backup</label>
+                    </div>
+                    <div data-bind="validationElement: incrementalBackupEnabled">
+                        <div class="help-block" data-bind="validationMessage: incrementalBackupEnabled"></div>
+                    </div>
+                    <div data-bind="compose: $root.incrementalBackupCronEditor, visible: incrementalBackupEnabled"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <h3>Retention Policy</h3>
+    <div class="panel" data-bind="with: retentionPolicy">
+        <div class="padding">
+            <div class="toggle">
+                <input id="limit-backups-by-age" type="checkbox" data-bind="checked: retentionPolicyEnabled">
+                <label for="limit-backups-by-age">Limit # of backups by age</label>
+            </div>
+            <div class="row collapse" data-bind="collapse: retentionPolicyEnabled">
+                <div class="col-sm-8 col-lg-6 margin-top margin-bottom">
+                    <div class="row" data-bind="validationElement: minimumBackupAgeToKeep">
+                        <label class="control-label col-xs-12 col-sm-6 col-lg-4">
+                            Minimum retention time <small><i id="backup-age-info" class="icon-info text-info"></i></small>
+                        </label>
+                        <div class="col-xs-12 col-sm-6 col-lg-8">
+                            <input type="text" class="form-control" data-bind="durationPicker: minimumBackupAgeToKeep, durationPickerOptions: { showDays: true }" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-offset-4">
+                            <span data-bind="validationElement: minimumBackupAgeToKeep">
+                                <span class="help-block" data-bind="validationMessage: minimumBackupAgeToKeep"></span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row" data-bind="if: !minimumBackupAgeToKeep.error()">
+                        <div class="col-sm-offset-2">
+                            <div class="bg-info padding padding-sm small margin-top">
+                                <i class="icon-info"></i><span data-bind="html: humaneRetentionDescription"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <h3>Encryption</h3>
+    <div class="panel" data-bind="with: encryptionSettings" data-bind="validationElement: enabled">
+        <div class="padding">
+            <div class="flex-horizontal" data-bind="validationElement: enabled">
+                <div class="toggle margin-right" data-bind="validationOptions: { insertMessages: false }">
+                    <input id="toggle-encryption" type="checkbox" data-bind="checked: enabled">
+                    <label for="toggle-encryption">Encrypt backup</label>
+                </div>
+                <span class="help-block" data-bind="validationMessage: enabled"></span>
+                <small data-bind="visible: $root.configuration().backupType() === 'Snapshot' && enabled()"><i id="serverwide-snapshot-encryption-info" class="icon-info text-info"></i></small>
+            </div>
+            <div data-bind="collapse: needExplicitConsent">
+                <div class="flex-horizontal" data-bind="validationElement: allowUnencryptedBackupForEncryptedDatabase">
+                    <div class="toggle margin-right" data-bind="validationOptions: { insertMessages: false }">
+                        <input id="toggle-unencrypted-backup" type="checkbox" data-bind="checked: allowUnencryptedBackupForEncryptedDatabase">
+                        <label for="toggle-unencrypted-backup">Allow unencrypted backup for encrypted database</label>
+                    </div>
+                    <span class="help-block" data-bind="validationMessage: allowUnencryptedBackupForEncryptedDatabase"></span>
+                </div>
+            </div>
+            <div data-bind="collapse: showOriginalKeySection">
+                <div class="row">
+                    <label class="control-label col-sm-4 col-lg-2">Current Encryption Key</label>
+                    <div class="col-sm-4">
+                        <input type="text" data-bind="textInput: originalKey" class="form-control margin-bottom" disabled title="This key is currently in use"/>
+                    </div>
+                </div>
+                <div class="row" >
+                    <div class="col-sm-4 col-sm-offset-4 col-lg-offset-2">
+                        <div class="toggle margin-bottom">
+                            <input id="toggleChangeKey" type="checkbox" data-bind="checked: changeKeyRequest">
+                            <label for="toggleChangeKey">Change encryption key</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-addon padding padding-lg" data-bind="collapse: showProvidedKeySection">
+                <div class="row">
+                    <div class="col-sm-12 col-lg-6">
+                        <div>
+                            <h3 data-bind="visible: !changeKeyRequest()">Encryption Key Configuration</h3>
+                            <h3 data-bind="visible: changeKeyRequest">Select New Encryption Key</h3>
+                        </div>
+                        <hr />
+                        <div data-bind="with: encryptionSection">
+                            <div data-bind="compose: 'resources/setupEncryptionKey.html'"></div>
+                        </div>
+                        <div class="bg-warning padding padding-sm small flex-horizontal">
+                            <div>
+                                <i class="icon-warning"></i>
+                            </div>
+                            <div>
+                                <span>
+                                    The encryption key defined in this section will be used only if the database being backed up is <strong>Not encrypted</strong>.<br>
+                                    If the database backed up is <strong>encrypted</strong> then the backup will use the database key itself.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div data-bind="compose: 'partial/backupDestinations.html'"></div>
+</form>
+
+<script type="text/html" id="test-connection-results-template">
+    <div data-bind="with: testConnectionResult">
+        <div class="padding bg-success small" data-bind="visible: Success">
+            <div>Successfully connected</div>
+        </div>
+        <div class="padding bg-danger small" data-bind="visible: !Success">
+            Connection test failed: <span data-bind="text: $parent.fullErrorDetailsVisible() ? Error : $parent.shortErrorText()"></span>
+
+            <div>
+                <a href="#" data-bind="click: $parent.fullErrorDetailsVisible.toggle.bind($parent.fullErrorDetailsVisible), text: $parent.fullErrorDetailsVisible() ? 'hide details' : 'show details'"></a>
+            </div>
+        </div>
+    </div>
+</script>

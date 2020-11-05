@@ -1,0 +1,409 @@
+<div class="flex-window stretch query content-margin margin-bottom margin-bottom-sm" id="queryContainer">
+    <div class="flex-window-head" data-bind="visible: !resultsExpanded()">
+        <div class="row">
+        </div>
+        <div class="row margin-bottom">
+            <div class="col-sm-2">
+                <h2 class="query-title on-base-background">Query </h2>
+                <div><a href="#" data-bind="click: syntaxHelp"><small>Syntax <i class="icon-help"></i></small></a></div>
+            </div>
+            <div class="col-sm-10">
+                <div class="query-container">
+                    <div class="query-main">
+                        <div class="has-warning query-error" data-bind="visible: containsAsterixQuery">
+                            <div class="help-block">
+                                <i class="icon-warning"></i> <span>The Query contains <strong>*.*</strong>. Did you intend to use <strong>*:*</strong> ?</span>
+                            </div>
+                        </div>
+                        <div class="clearfix toolbar">
+                            <div class="pull-right-sm flex-horizontal">
+                                <div class="input-group query-save" data-bind="css: { active: inSaveMode }, validationOptions: { insertMessages: false }, validationElement: querySaveName">
+                                    <input class="form-control" style="display: none" placeholder="Query name" data-bind="textInput: querySaveName">
+                                    <span class="input-group-btn">
+                            <button class="btn btn-success" data-class="active" type="button" data-bind="click: saveQuery" title="Save query under given name">
+                                <i class="icon-save"></i> <span data-bind="text: inSaveMode() ? 'Save' : 'Save...'"></span>
+                            </button>
+                        </span>
+                                </div>
+                                <div class="dropdown dropdown-right loadpatch" data-bind="template: { name: 'saved-queries-dialog' }">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm pull-right" role="group">
+                            <div class="dropdown">
+                                <button class="btn btn-default btn-sm dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                    <i class="icon-settings"></i><span>Settings</span>
+                                    <span class="caret"></span>
+                                </button>
+                                <div class="dropdown-menu settings-menu" data-bind="dropdownPanel: true, template: { name: 'settings-template' }">
+                                </div>
+                            </div>
+                        </div>
+                        <pre class="form-control editor query-source"
+                             data-bind="aceEditor: { code: criteria().queryText, allowResize: true, minHeight: 180, maxHeight: 600, lang:'ace/mode/rql', completer: queryCompleter.complete, hasFocus: queryHasFocus }, validationOptions: { errorsAsTitle: false }, validationElement: criteria().queryText"></pre>
+
+                        <div data-bind="validationOptions: { errorsAsTitle: false }, validationElement: criteria().queryText">
+                            <div class="help-block" data-bind="validationMessage: criteria().queryText"></div>
+                        </div>
+                    </div>
+                    <div class="query-controls">
+                        <button class="btn btn-primary btn-block btn-lg text-center run-query" data-bind="click: _.partial(runQuery, null), css: { 'btn-spinner': isLoading }">
+                            <i class="icon-play2 icon-lg"></i><br />
+                            <small class="kbd"><kbd>ctrl</kbd> <strong>+</strong> <kbd>enter</kbd></small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="flex-window-scroll flex-window stretch query-results-container">
+        <div class="flex-window-head">
+            <h2 class="on-base-background">
+                Results
+                <a target="_blank" href="#" title="Show raw output" data-bind="attr: { href: rawJsonUrl }"><i class="icon-link"></i></a>
+            </h2>
+            <div class="clearfix">
+                <div class="results-info on-base-background pull-left btn-group">
+                    <div data-bind="visible: queryStats() && hasEditableIndex() && !isGraphQuery(), if: queryStats() && hasEditableIndex() && !isGraphQuery()" class="dropdown btn-group" >
+                        <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="dropdownMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            <span>
+                                <i class="icon-index"></i> <span>Index '</span><span data-bind="text: queriedIndexLabel"></span>'
+                            </span>
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMenu">
+                            <li>
+                                <a href="#" data-bind="attr: { href: editIndexUrl }">
+                                    <strong><i data-bind="attr: { class: isAutoIndex() ? 'icon-preview' : 'icon-edit' }"></i> <span data-bind="text: isAutoIndex() ? 'View index' : 'Edit index'"></span></strong>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" data-bind="click: explainIndex, visible: isDynamicQuery" title="Shows why given index was used to serve the query">
+                                    <i class="icon-info"></i> <span>Explain why this index was used</span>
+                                </a>
+                                <a data-bind="visible: !isDynamicQuery()" class="disabled has-disable-reason" title="Available only for dynamic indexes" data-placement="right">
+                                    <i class="icon-info"></i> <span>Explain why this index was used</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" data-bind="attr: { href: termsUrl }" title="Navigate to index terms">
+                                    <i class="icon-terms"></i> <span>View index terms</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" data-bind="attr: { href: indexPerformanceUrl }" title="Navigate to index performance">
+                                    <i class="icon-traffic-watch"></i> <span>Index performance</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" data-bind="visible: isMapReduceIndex, attr: { href: visualizerUrl }" title="MapReduce Visualizer">
+                                    <i class="icon-map-reduce-visualizer"></i> <span>MapReduce Visualizer</span>
+                                </a>
+                                <a data-bind="visible: !isMapReduceIndex()" class="disabled has-disable-reason" title="Available only for map-reduce indexes" data-placement="right">
+                                    <i class="icon-map-reduce-visualizer"></i> <span>MapReduce Visualizer</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <small data-bind="if: queryStats(), visible: queryStats()">
+                        <span data-bind="if: !isGraphQuery()">
+                            <strong data-bind="if: !hasEditableIndex(), visible: !hasEditableIndex()">
+                                <i class="icon-documents"></i><span data-bind="text: queriedIndexDescription"></span>
+                            </strong>
+                            <span data-bind="visible: queriedIndex() && queriedIndex().indexOf('collection') === 0">&nbsp;collection</span>
+                            &nbsp;was used to get <span data-bind="text: fromCache() ? 'cached' : 'the'"></span> results in
+                            <strong data-bind="text: queryStats().DurationInMs.toLocaleString() + ' ms'"></strong>
+                            <span data-bind="visible: originalRequestTime, if: originalRequestTime">(original request took: <strong data-bind="text: originalRequestTime().toLocaleString() + ' ms'"></strong>)</span>
+                            <span data-bind="visible: queriedFieldsOnly">
+                                . Showing <strong>stored index fields</strong> only. 
+                            </span>
+                            <span data-bind="visible: queriedIndexEntries">. Showing <strong>raw index entries</strong>.</span>
+                        </span>
+                        <span data-bind="if: isGraphQuery">
+                            <strong>
+                                <i class="icon-indexing"></i><span>Graph</span>
+                            </strong>
+                            query took: 
+                            <strong data-bind="text: queryStats().DurationInMs.toLocaleString() + ' ms'"></strong>
+                        </span>
+                    </small>
+                </div>
+                <div class="pull-right" role="group">
+                    <div class="btn-group has-disable-reason" data-bind="attr: { 'data-original-title': deleteDocumentDisableReason }, visible: currentTab() === 'results'">
+                        <button type="button" class="btn btn-danger btn-sm" data-bind="enable: canDeleteDocumentsMatchingQuery, click: deleteDocsMatchingQuery">
+                            <i class="icon-trash"></i> <span>Delete documents</span>
+                        </button>
+                    </div>
+                    <button class="btn btn-default btn-sm statistics" data-bind="click: openQueryStats, enable: queryStats, visible: currentTab() === 'results'">
+                        <i class="icon-stats"></i><span>Statistics</span>
+                    </button>
+                    <div class="btn-group" data-bind="visible: currentTab() === 'results'">
+                        <button type="button" class="btn btn-default btn-sm" data-bind="click: exportCsvFull, enable: canExportCsv" title="Export query results to CSV file">
+                            <i class="icon-csv-export"></i><span>Export as CSV</span>
+                        </button>
+                        <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" data-bind="enable: canExportCsv">
+                            <span class="caret"></span>
+                            <span class="sr-only">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li title="Export visible columns only"><a href="#" data-bind="click: exportCsvVisibleColumns"><i class="icon-csv-export"></i><span>Export visible columns only</span></a></li>
+                        </ul>
+                    </div>
+                    <div class="btn-group dropdown-right" data-bind="visible: !showTimeSeriesGraph()">
+                        <button class="btn btn-default btn-sm dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            <i class="icon-table"></i><span>Display</span>
+                            <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu colselect-dropdown colselect-sm slidein-style" role="menu" data-bind="dropdownPanel: true">
+                            <div data-bind="compose: $root.columnsSelector"></div>
+                        </ul>
+                    </div>
+                    <button class="btn btn-default btn-sm" data-bind="click: toggleResults">
+                        <i data-bind="attr: { class: resultsExpanded() ? 'icon-fold' : 'icon-unfold'} "></i>
+                        <span data-bind="text: resultsExpanded() ? 'Collapse results' : 'Expand results'"></span>
+                    </button>
+                </div>
+                <div class="btn-group-label active pull-right margin-right margin-right-sm" data-label="Selection" role="group" data-bind="visible: showPlotButton">
+                    <button type="button" class="btn btn-sm btn-default" title="Plot time series data" data-bind="click: plotTimeSeries">
+                        <i class="icon-stats"></i> <span>Plot time series</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="panel flex-window-scroll no-margin">
+            <div class="has-error results-error" data-bind="visible: staleResult()">
+                <div class="help-block">
+                    <i class="icon-danger"></i><span>Your index is stale. It's possible that not all the results are displayed. <a href="#" data-bind="click: refresh">Refresh.</a></span>
+                </div>
+            </div>
+            <div class="has-error results-error" data-bind="visible: dirtyResult() && !staleResult()">
+                <div class="help-block">
+                    <i class="icon-danger"></i><span>Your data has changed. The results may contain duplicates or non-current entries. <a href="#" data-bind="click: refresh">Refresh.</a></span>
+                </div>
+            </div>
+            <div class="has-warning results-error" data-bind="visible: showFanOutWarning()">
+                <div class="help-block">
+                    <i class="icon-warning"></i>
+                    <span>Using <code>offset</code> or <code>limit</code> in RQL for fanout indexes may produce unpredictable paging. 
+                        <a href="#" target="_blank" data-bind="attr: { href: 'https://ravendb.net/l/LT8GZF/' +  $root.clientVersion() }">See details.</a>
+                    </span>
+                </div>
+            </div>
+            <div class="scroll-stretch">
+                <div class="panel-body" data-bind="visible: showVirtualTable()">
+                    <virtual-grid class="resizable" params="controller: gridController, emptyTemplate: 'empty-query-template'"></virtual-grid>
+                </div>
+                <div class="panel-body js-timings-container timings absolute-fill" data-bind="visible: currentTab() === 'timings'">
+                    <div class="toggle toggle-right">
+                        <input id="log-scale" class="styled" type="checkbox" data-bind="checked: timingsGraph.useLogScale">
+                        <label for="log-scale" class="properties-label">
+                            Use logarithmic scale
+                        </label>
+                    </div>
+                    <div class="from-cache bg-info padding padding-sm" data-bind="visible: $root.fromCache">
+                        <i class="icon-info"></i> <span>Using cached timinigs</span>
+                    </div>
+                    <div class="legend" data-bind="with: timingsGraph.rootNode">
+                        <div class="legend-item" data-bind="template: { name: 'timing-item-template' }">
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body js-graph-container graph-container absolute-fill" data-bind="visible: currentTab() === 'graph'">
+                </div>
+                <div class="panel-body absolute-fill js-time-series-graph-container" data-bind="if: showTimeSeriesGraph(), visible: showTimeSeriesGraph()">
+                    <div class="absolute-fill flex-vertical" data-bind="compose: $root.currentTab"></div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-window-head">
+            <button type="button" class="btn btn-sm" 
+                    data-bind="css: { active: currentTab() === 'results'}, click: goToResultsTab">
+                Results &nbsp; <span class="label" data-bind="text: totalResultsForUi().toLocaleString() + (hasMoreUnboundedResults() ? '+' : ''), css: { 'label-primary': totalResultsForUi(), 'label-default': !totalResultsForUi() }"></span>
+            </button>
+            <!-- ko foreach: includesCache -->
+                <button type="button" class="btn btn-sm" data-bind="click: $root.goToIncludesTab, css: { active: $parent.currentTab() === $data }">
+                    <span data-bind="text: 'Includes (' + name + ')'"></span> &nbsp; <span class="label label-primary" data-bind="text: total().toLocaleString()"></span>
+                </button>
+            <!-- /ko -->
+            <button type="button" class="btn btn-sm" data-bind="click: $root.goToExplanationsTab, css: { active: currentTab() === 'explanations' }, visible: totalExplanations()">
+                <span>Explanations</span> &nbsp; <span class="label label-primary" data-bind="text: totalExplanations().toLocaleString()"></span>
+            </button>
+            <!-- ko foreach: highlightsCache -->
+                <button type="button" class="btn btn-sm" data-bind="click: $root.goToHighlightsTab, css: { active: $parent.currentTab() === $data }">
+                    <span data-bind="text: 'Highlight (' + fieldName() + ')'"></span> &nbsp; <span class="label label-primary" data-bind="text: totalCount().toLocaleString()"></span>
+                </button>
+            <!-- /ko -->
+            <button type="button" class="btn btn-sm" data-bind="click: $root.goToTimingsTab, css: { active: currentTab() === 'timings' }, visible: timings()">
+                Timings
+            </button> 
+            <button type="button" class="btn btn-sm" data-bind="click: $root.goToGraphTab, css: { active: currentTab() === 'graph' }, visible: isGraphQuery">
+                Graph
+            </button>
+            <!-- ko foreach: timeSeriesGraphs -->
+                <button type="button" class="btn btn-sm" data-bind="click: $root.goToTimeSeriesTab, css: { active: $parent.currentTab() === $data }">
+                    <i class="icon-stats"></i> <span data-bind="text: 'Time Series'"></span> &nbsp; <span class="label label-primary" data-bind="click: $root.closeTimeSeriesTab"><i class="icon-cancel"></i></span>
+                </button>
+            <!-- /ko -->
+            <!-- ko foreach: timeSeriesTables -->
+            <button type="button" class="btn btn-sm" data-bind="click: $root.goToTimeSeriesTab, css: { active: $parent.currentTab() === $data }">
+                <i class="icon-table"></i> <span data-bind="text: documentId + ' - ' + name"></span> &nbsp; <span class="label label-primary" data-bind="click: $root.closeTimeSeriesTab"><i class="icon-cancel"></i></span>
+            </button>
+            <!-- /ko -->
+            
+        </div>
+    </div>
+    <div class="hidden">
+        <form method="post" download target="hidden-form" id="exportCsvForm">
+            <input type="hidden" name="ExportOptions"/>
+        </form>
+    </div>
+</div>
+
+<script type="text/html" id="timing-item-template">
+    <i data-bind="attr: { 'class': 'item-rect ' +  $root.timingsGraph.getColorClass(name) }"></i>
+    <span class="name" data-bind="text: name"></span>
+    <span class="duration" data-bind="text: duration.toLocaleString() + ' ms'"></span>
+    <div data-bind="foreach: children">
+        <div class="legend-item" data-bind="template: { name: 'timing-item-template' }, visible: visible">
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="empty-query-template">
+    <div data-bind="visible: !$root.isEmptyFieldsResult()">
+        No results found.
+    </div>
+    <div data-bind="if: $root.isEmptyFieldsResult">
+        Index <strong data-bind="text: $root.queriedIndexLabel"></strong> doesn't contain any stored fields.
+    </div>
+</script>
+
+<div class="tooltip json-preview js-query-tooltip" style="opacity: 0">
+    <pre><code></code></pre>
+</div>
+
+<script type="text/html" id="settings-template">
+    <div class="row settings-item">
+        <div class="col-xs-offset-1 col-xs-6">
+            <div class="control-label">Cache enabled</div>
+        </div>
+        <div class="col-xs-5">
+            <div class="toggle flex-row">
+                <input type="checkbox" class="styled" data-bind="checked: cacheEnabled">
+                <label class="flex-end"></label>
+            </div>
+        </div>
+    </div>
+    <div class="row settings-item">
+        <div class="col-xs-offset-1 col-xs-6">
+            <div class="control-label">Show stored index fields only</div>
+        </div>
+        <div class="col-xs-5">
+            <div class="toggle flex-row">
+                <input type="checkbox" class="styled" data-bind="checked: criteria().showFields, disable: isCollectionQuery() || isGraphQuery()">
+                <label class="flex-end"></label>
+            </div>
+        </div>
+    </div>
+    <div class="row settings-item">
+        <div class="col-xs-offset-1 col-xs-6">
+            <div class="control-label" data-bind="visible: queryResultsContainMatchingDocuments">Show the raw index entries instead of matching documents</div>
+            <div class="control-label" data-bind="visible: !queryResultsContainMatchingDocuments()">Show the raw index entries instead of index results</div>
+        </div>
+        <div class="col-xs-5">
+            <div class="toggle flex-row">
+                <input type="checkbox" class="styled" data-bind="checked: criteria().indexEntries, disable: isCollectionQuery() || isGraphQuery()">
+                <label class="flex-end"></label>
+            </div>
+        </div>
+    </div>
+</script>
+
+<script type="text/html" id="saved-queries-dialog">
+    <button class="btn btn-default dropdown-toggle" type="button" id="dropdownLoadQuery" data-toggle="dropdown" data-bind="enable: hasAnySavedQuery, click: showFirstItemInPreviewArea" title="Load saved query">
+        <i class="icon-query"></i><span>Load Query</span>
+        <span class="caret"></span>
+    </button>
+    <div class="dropdown-menu slidein-style" aria-labelledby="dropdownLoadQuery" data-bind="dropdownPanel: true">
+        <div class="loadpatch-dropdown flex-vertical" data-bind="css: { 'show-preview': previewItem() }">
+            <div class="flex-grow loadpatch-container">
+                <div class="patch-preview-container flex-vertical">
+                    <div class="flex-header">
+                        <h2>Query preview</h2>
+                    </div>
+                    <div class="flex-grow flex-vertical scroll">
+                        <div class="bg-info padding padding-sm">
+                            <div class="row">
+                                <div class="col-xs-9">
+                                   Name: &nbsp;<strong data-bind="text: previewItem() ? previewItem().name : ''"></strong>
+                                </div>
+                                <div class="col-xs-3">                                 
+                                    <span class="pull-right"> 
+                                        <button title="Load saved query" class="btn btn-success btn-sm close-panel" data-bind="click: useQuery, enable: previewItem()">Load</button>
+                                    </span>
+                                </div>
+                            </div>                           
+                        </div>
+                        <div class="pre-container">
+<pre class="bg-info">
+<code data-bind="text: previewCode"></code>
+</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="patch-list-container flex-vertical">
+                    <div class="flex-header">
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <h2>Select query</h2>
+                            </div>
+                            <div class="col-xs-6">
+                                <input type="search" class="form-control input-sm patch-filter" data-bind="textInput: filters.searchText" placeholder="filter" title="Filter saved queries by name">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex-grow scroll">
+                        <ul class="patch-list" data-bind="foreach: filteredQueries">
+                            <li data-bind="css: { selected: $data === $parent.previewItem() }, event: { mouseenter: $parent.previewQuery }">
+                                <a href="#" class="patch-link close-panel" data-bind="click: $parent.useQueryItem.bind($parent, $data)">
+                                    <span class="name" data-bind="text: name"></span>
+                                    <span class="modified flex-noshrink" data-bind="text: modificationDate"></span>
+                                </a>
+                                <a href="#" data-bind="click: $parent.removeQuery" class="patch-remove"><i class="icon-trash"></i></a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</script>
+
+
+<script type="text/html" id="time-series-graph-tooltip">
+    <div class="tooltip-inner" data-bind="visible: items.length">
+        <table>
+            <tbody>
+            <!-- ko foreach: items -->
+            <tr>
+                <td class="name">
+                    <span data-bind="attr: { class: $parent.getColorClass(series) + ' ' + $parent.type }">
+                        <i class="icon-stats"></i>
+                    </span>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td class="value">
+                    <strong class="margin-left" data-bind="text: value"></strong>
+                </td>
+                <td class="date">
+                    <div class="margin-left" data-bind="text: dateDescription"></div>
+                </td>
+            </tr>
+            <!-- /ko -->
+            </tbody>
+        </table>
+        <div class="bg-info">
+            <small><i class="icon-info"></i> All dates are in local time zone</small>
+        </div>
+    </div>
+</script>

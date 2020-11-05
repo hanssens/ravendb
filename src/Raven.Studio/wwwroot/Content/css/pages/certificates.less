@@ -1,0 +1,42 @@
+﻿.certificates {
+    .certificate-item {
+        .flex-horizontal {
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: @screen-lg-max) {
+            .certificate-name {
+                width: 100%;
+            }
+        }
+
+        .thumbprint {
+            font-size: 12px;
+        }
+
+        h3 {
+            margin: 0;
+        }
+
+        .panel-addon {
+            font-size: 13px;
+        }
+
+        .clearance {
+            width: 150px;
+            flex-shrink: 0;
+        }
+        
+        .clearance, .permissions, .expiration, .auto-renew {
+            margin-top: 0;
+            line-height: 18px;
+            margin-right: @grid-gutter-width/2;
+            white-space: nowrap;
+        }
+        .permissions {
+            strong + strong {
+                margin-left: @grid-gutter-width / 4;
+            }
+        }
+    }
+}

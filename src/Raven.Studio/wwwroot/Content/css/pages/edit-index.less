@@ -1,0 +1,144 @@
+.edit-index {
+
+    .panel-info {
+        background-color: fadeout(@brand-info-dark,60%);
+    }
+
+    @media (min-width:@screen-xl) {
+        .index-name {
+            order:1;
+        }
+        .index-properties {
+            order:2;
+        }
+
+        .index-actions {
+            order:3;
+        }
+    }
+    
+    .sourcePreview {
+        min-height: 400px;
+    }
+}
+
+.auto-index {
+    .labels {
+        h6 {
+            line-height: 18px
+        }
+    }
+
+    .label {
+        width: 120px;
+        color: @text-muted;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .indexing-options {
+        border-top: 1px solid @gray-dark;
+        font-size: 10px;
+        text-transform: uppercase;
+        text-align: center;
+        color: @gray-dark;
+        padding-top: 4px;
+
+        .item {
+            color: @text-color;
+
+            &:not(.active) {
+                .icon-check {
+                    display: none;
+                }
+            }
+
+            & + .item {
+                border-left: 1px solid @gray-dark;
+                margin-left: @grid-gutter-width/3;
+                padding-left: @grid-gutter-width/3;
+            }
+
+            &.active {
+                .icon-cancel {
+                    display: none;
+                }
+
+                color: @gray-light;
+
+                .icon-check {
+                    .text-success;
+                }
+            }
+        }
+    }
+
+    .property {
+        margin: 7px 15px;
+        text-align: center;
+    }
+
+    .panel {
+        .collection, .fieldname {
+            h4 {
+                font-weight: bold;
+                color: @text-emphasis;
+            }
+        }
+
+        &:first-of-type {
+            .fieldname, .sort, .operation, .collection {
+                position: relative;
+
+                &:before {
+                    position: absolute;
+                    display: block;
+                    left: -110px;
+                    width: 80px;
+                    text-align: center;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    color: @text-color;
+                }
+            }
+
+            .collection:before {
+                content: 'Collection';
+            }
+
+            .fieldname:before {
+                content: 'Field name';
+            }
+
+            .sort:before {
+                content: 'Sort';
+            }
+
+            .operation:before {
+                content: 'Operation';
+            }
+        }
+    }
+
+    .label-margin {
+        margin-left: 127px;
+        text-align: center;
+    }
+
+    hr {
+        border-color: @gray-darker;
+    }
+}
+
+#additionalsource {
+    .item-list {
+        margin-right: @grid-gutter-width/2;
+    }
+
+    pre {
+        flex-grow: 1;
+        height: 400px;
+    }
+}

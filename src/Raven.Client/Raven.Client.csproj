@@ -1,0 +1,89 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version></Version>
+    <Description>RavenDB Client is the client library for accessing RavenDB</Description>
+    <Authors>Hibernating Rhinos</Authors>
+    <TargetFrameworks>netcoreapp3.1;netcoreapp2.1;netstandard2.1;netstandard2.0</TargetFrameworks>
+    <DefineConstants>$(DefineConstants);PORTABLE</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Raven.Client</AssemblyName>
+    <PackageId>RavenDB.Client</PackageId>
+    <PackageTags>ravendb;client;database;nosql;doc db</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Product>RavenDB Client</Product>
+    <Title>RavenDB Client</Title>
+    <CodeAnalysisRuleSet>..\..\RavenDB.Client.ruleset</CodeAnalysisRuleSet>
+    <Configurations>Debug;Release;Validate</Configurations>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Validate'">
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <Compile Remove="Properties\AssemblyInfo.Linux.cs" />
+    <Compile Include="..\CommonAssemblyInfo.Windows.cs" Link="Properties\CommonAssemblyInfo.Windows.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <Compile Remove="Properties\AssemblyInfo.Windows.cs" />
+    <Compile Include="..\CommonAssemblyInfo.Linux.cs" Link="Properties\CommonAssemblyInfo.Linux.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\CommonAssemblyInfo.cs" Link="Properties\CommonAssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- this is required for the nuget build to properly include the right files -->
+    <Content Include="..\Sparrow\bin\Release\netstandard2.0\Sparrow.dll">
+      <PackagePath>lib/netstandard2.0/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="..\Sparrow\bin\Release\netstandard2.0\Sparrow.xml">
+      <PackagePath>lib/netstandard2.0/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <!-- this is required for the nuget build to properly include the right files -->
+    <Content Include="..\Sparrow\bin\Release\netstandard2.1\Sparrow.dll">
+      <PackagePath>lib/netstandard2.1/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="..\Sparrow\bin\Release\netstandard2.1\Sparrow.xml">
+      <PackagePath>lib/netstandard2.1/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <!-- this is required for the nuget build to properly include the right files -->
+    <Content Include="..\Sparrow\bin\Release\netcoreapp2.1\Sparrow.dll">
+      <PackagePath>lib/netcoreapp2.1/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="..\Sparrow\bin\Release\netcoreapp2.1\Sparrow.xml">
+      <PackagePath>lib/netcoreapp2.1/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <!-- this is required for the nuget build to properly include the right files -->
+    <Content Include="..\Sparrow\bin\Release\netcoreapp3.1\Sparrow.dll">
+      <PackagePath>lib/netcoreapp3.1/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+    <Content Include="..\Sparrow\bin\Release\netcoreapp3.1\Sparrow.xml">
+      <PackagePath>lib/netcoreapp3.1/</PackagePath>
+      <Pack>true</Pack>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sparrow\Sparrow.csproj" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Lambda2Js.Signed" Version="3.1.3" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.1.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
+    <PackageReference Include="System.Memory" Version="4.5.4" />
+    <PackageReference Include="Raven.CodeAnalysis" Version="1.0.11">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.7.1" />
+    <PackageReference Include="System.Runtime.InteropServices.RuntimeInformation" Version="4.3.0" />
+    <PackageReference Include="System.Security.Cryptography.Cng" Version="4.7.0" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
+  </ItemGroup>
+</Project>

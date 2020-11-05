@@ -1,0 +1,98 @@
+<div class="flex-vertical absolute-fill content-margin traffic-watch">
+    <div class="flex-horizontal flex-wrap nospacing flex-noshrink">
+        <div class="flex-horizontal flex-wrap margin-bottom margin-sm">
+            <div>
+                <button class="btn btn-primary" data-bind="click: pause, visible: liveClient">
+                    <i class="icon-pause"></i> <span>Pause</span>
+                </button>
+                <button class="btn btn-primary" data-bind="click: resume, visible: !liveClient()">
+                    <i class="icon-play"></i> <span>Resume</span>
+                </button>
+                <button class="btn btn-default" data-bind="click: exportToFile">
+                    <i class="icon-export"></i><span>Export</span>
+                </button>
+            </div>
+            <div class="btn-group">
+                <select id="visibleTypesSelector" size="5" multiple="multiple"
+                        data-bind="options: filteredTypeData, selectedOptions: selectedTypeNames, optionsText: 'propertyName', optionsValue: 'propertyName'"></select>
+            </div>
+            <div id="trafficFilter">
+                <input class="form-control" placeholder="Filter" data-bind="textInput: filter">
+            </div>
+            <div class="checkbox">
+                <input class="styled" id="onlyErrors" type="checkbox" data-bind="checked: onlyErrors">
+                <label for="onlyErrors">Show errors only</label>
+            </div>
+        </div>
+        <div class="flex-separator"></div>
+        <div class="panel margin-bottom margin-sm flex-grow">
+            <div class="panel-addon">
+                <div class="flex-horizontal flex-wrap margin-top">
+                    <div class="properties-container flex-horizontal">
+                        <div class="property">
+                            <h5><i class="icon-running-tasks"></i> Requests</h5>
+                            <strong data-bind="text: stats.count"></strong>
+                        </div>
+                        <div class="property">
+                            <h5><i class="icon-arrow-filled-down"></i> Minimum duration</h5>
+                            <strong data-bind="text: stats.min"></strong>
+                        </div>
+                        <div class="property" data-toggle="tooltip" title="Average request duration (excluding web sockets)" data-placement="bottom">
+                            <h5><i class="icon-average"></i> Average duration</h5>
+                            <strong data-bind="text: stats.avg"></strong>
+                        </div>
+                        <div class="property">
+                            <h5><i class="icon-arrow-filled-up"></i> Maximum duration</h5>
+                            <strong data-bind="text: stats.max"></strong>
+                        </div>
+                    </div>
+                    <div class="flex-separator"></div>
+                    <div class="properties-container percentiles-container" data-label="Percentiles" data-toggle="tooltip" title="Percentiles" data-placement="top">
+                        <div class="property">
+                            <h5>90%</h5>
+                            <strong data-bind="text: stats.percentile_90"></strong>
+                        </div>
+                        <div class="property">
+                            <h5>99%</h5>
+                            <strong data-bind="text: stats.percentile_99"></strong>
+                        </div>
+                        <div class="property">
+                            <h5>99.9%</h5>
+                            <strong data-bind="text: stats.percentile_99_9"></strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="flex-horizontal">
+        <div class="flex-separator"></div>
+        <div class="btn-group">
+            <button class="btn btn-sm btn-info btn-checkable" data-bind="click: toggleTail, css: { active: tailEnabled }">
+                <i class="icon-logs"></i> <span>Monitoring (tail -f)</span>
+            </button>
+            <button class="btn btn-sm btn-danger" data-bind="click: clear">
+                <i class="icon-cancel"></i><span>Clear</span>
+            </button>
+        </div>
+    </div>
+    <div class="flex-grow">
+        <div class="has-error results-error" data-bind="visible: isBufferFull">
+            <div class="help-block">
+                <i class="icon-danger"></i><span> The log buffer is full. <a href="#" data-bind="click: clear">Clear all entries.</a></span>
+            </div>
+        </div>
+        <div class="scroll-stretch">
+            <div class="panel-body">
+                <virtual-grid class="resizable" params="controller: gridController, emptyTemplate: 'empty-traffic-watch-template'"></virtual-grid>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/html" id="empty-traffic-watch-template">
+    No entries for now.
+</script>
+
+<div class="tooltip json-preview lg js-traffic-watch-tooltip" style="opacity: 0">
+</div>
